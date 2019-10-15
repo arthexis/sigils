@@ -21,8 +21,8 @@ def test_resolve_attributes():
 
 
 def test_context_is_required():
-    with pytest.raises(SigilError):
-        result = resolve("[ENV]", required=True)
+    with pytest.raises(ValueError):
+        result = resolve("[ENV]", required=True, default=None)
 
 
 def test_required_key_not_in_context():

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from .extract import extract
 from .parse import parser
@@ -48,32 +48,34 @@ def set_context(key: str, value: Any) -> None:
     _context[key] = value
 
 
-# noinspection PyBroadException
+# noinspection PyBroadException,PyDefaultArgument
 def resolve(
             text: str,
-            context: dict = None,
+            context: Optional[dict] = None,
             required: bool = False,
-            coerce: Callable = None
+            coerce: Callable = None,
+            default: Optional[dict] = _context,
         ) -> str:
     """
     Resolve all sigils found in text, using the specified context.
     If the sigil can't be resolved, return it unchanged unless
     required is True, in which case raise SigilError.
 
+    :param default:
     :param text: The text containing sigils.
     :param context: Optional dict of context used for resolution.
     :param required: If True, raise SigilError if a sigil can't resolve.
     :param coerce: Callable used to coerce resolved sigils, default str.
+    :param default: Default context to use, set to None to disable.
 
     >>> # Resolving sigils using local context:
     >>> context = {"ENV": {"HOST": "localhost"}, "USER": "arthexis"}
     >>> resolve("Connect to [ENV.HOST] as [USER]", context)
     'Connect to localhost as arthexis'
     """
-    global _context
 
     coerce = coerce or str
-    context = {**_context, **(context or {})}
+    context = {**(default or {}), **(context or {})}
     if not context:
         raise ValueError("context is required")
     if text.startswith('[') and text.endswith(']'):
