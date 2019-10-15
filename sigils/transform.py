@@ -58,6 +58,9 @@ class SigilResolver(Transformer):
                 # If the object is callable, call it passing it arg.
                 # The returned value becomes the new parent object.
                 obj = obj(arg)
+            elif arg is not None:
+                # If parent is not callable, but arg was provided, try subscripting
+                obj = obj[arg]
         return obj
 
     # Flatten nodes (otherwise a Tree is returned)
