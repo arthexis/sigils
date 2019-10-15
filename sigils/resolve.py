@@ -5,47 +5,11 @@ from .extract import extract
 from .parse import parser
 from .transform import SigilResolver
 from .exceptions import SigilError
+from .context import _context
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["set_context", "resolve"]
-
-
-def _joiner(data):
-    def inner(sep):
-        return (sep or "").join(data)
-    return inner
-
-
-# Global default context
-# Don't modify this directly, use set_context()
-_context = {
-    "JOIN": _joiner
-}
-
-
-# noinspection PyUnresolvedReferences
-def set_context(key: str, value: Any) -> None:
-    """
-    Set a global default context for resolve.
-
-    :param key: String key used to lookup context.
-    :param value: The context value, usually a callable or instance.
-
-    >>> # Use resolve with only default global context
-    >>> set_context("SYS", {"PATH": "/usr/bin"})
-    >>> resolve("System path is [SYS.PATH]")
-    'System path is /usr/bin'
-
-    >>> # Use set_context to create a global function
-    >>> set_context("PERCENT", lambda x: int(float(x) * 100))
-    >>> context = {"VALUE": 0.5}
-    >>> resolve("The percent is [VALUE.PERCENT]%", context)
-    'The percent is 50%'
-    """
-
-    global _context
-    _context[key] = value
+__all__ = ["resolve"]
 
 
 # noinspection PyBroadException,PyDefaultArgument
@@ -79,15 +43,17 @@ def resolve(
     if not context:
         raise ValueError("context is required")
     if text.startswith('[') and text.endswith(']'):
-        sigils = {text}
+        sigils = {text}  # Don't waste time with extract
     else:
-        sigils = set(extract(text))
+        sigils = set(extract(text))  # Extract is necessary
     if not sigils:
         logger.debug("No sigils found in '%s'", text)
-        return text
+        return text  # Not an error, just do nothing
     logger.debug("Found sigils: %s", sigils)
     for sigil in sigils:
         try:
+            # By using a lark transformer, we parse and resolve
+            # each sigil in isolation and in a single pass
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
             logger.debug("Sigil %s resolved to '%s'", sigil, value)

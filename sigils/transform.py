@@ -15,7 +15,7 @@ class SigilResolver(Transformer):
 
     @v_args(inline=True)
     def sigil(self, *nodes):
-        obj = None
+        obj = None  # The current parent object
         for node in nodes:
             key, arg = node
             if not obj:
@@ -55,7 +55,7 @@ class SigilResolver(Transformer):
                         logger.error("Key %s not an attribute of %s", key, obj)
                         raise ex
             if callable(obj):
-                # If the object is callable, call it passing it arg.
+                # If the object is callable, call it passing arg.
                 # The returned value becomes the new parent object.
                 obj = obj(arg)
             elif arg is not None:
