@@ -26,6 +26,7 @@ class SigilResolver(Transformer):
                         obj = self.ctx[key]
                     except KeyError as ex:
                         logger.error("Key %s not in context", key)
+                        obj = None
                         raise ex
                     continue
 
@@ -40,10 +41,12 @@ class SigilResolver(Transformer):
                     obj = obj[key]
                 except KeyError as ex:
                     logger.error("Key %s not an item in %s", key, obj)
+                    obj = None
                     raise ex
                 except TypeError as ex:
                     _key = key.casefold()
                     if key.startswith("_"):
+                        obj = None
                         raise AttributeError("Key %s cannot be private", key)
                     try:
                         obj = getattr(obj, _key)
@@ -55,8 +58,11 @@ class SigilResolver(Transformer):
                             obj = func(obj)
                             continue
                         logger.error("Key %s not an attribute of %s", key, obj)
+                        obj = None
                         raise ex
             finally:
+                # Ensure callable nodes are always called
+                # If not callable, but arg was provided, subscript
                 if callable(obj):
                     obj = obj(arg)
                 elif arg is not None:
