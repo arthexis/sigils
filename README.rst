@@ -102,9 +102,9 @@ Create *<your_app>/templatetags/sigils.py* with the following code:
 
     @register.simple_tag
     def resolve(text, **context):
-        return sigils.resolve(text, **context)
+        return sigils.resolve(text, context)
 
-In your app.py file add the following to add a model to context
+In *app.py* add the following to register a model in the global context
 (rename MyModel to the name of your model class):
 
 .. code-block:: python

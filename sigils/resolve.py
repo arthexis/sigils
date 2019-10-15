@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from .extract import extract
 from .parse import parser
@@ -49,7 +49,12 @@ def set_context(key: str, value: Any) -> None:
 
 
 # noinspection PyBroadException
-def resolve(text: str, context: dict = None, required=False, coerce=str) -> str:
+def resolve(
+            text: str,
+            context: dict = None,
+            required: bool = False,
+            coerce: Callable = None
+        ) -> str:
     """
     Resolve all sigils found in text, using the specified context.
     If the sigil can't be resolved, return it unchanged unless
@@ -67,6 +72,7 @@ def resolve(text: str, context: dict = None, required=False, coerce=str) -> str:
     """
     global _context
 
+    coerce = coerce or str
     context = {**_context, **(context or {})}
     if not context:
         raise ValueError("context is required")
@@ -83,7 +89,7 @@ def resolve(text: str, context: dict = None, required=False, coerce=str) -> str:
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
-            text = text.replace(sigil, coerce(value) if coerce else value)
+            text = text.replace(sigil, coerce(value))
         except Exception as ex:
             if required:
                 raise SigilError(sigil) from ex
