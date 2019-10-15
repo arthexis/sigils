@@ -40,7 +40,7 @@ def set_context(key: str, value: Any) -> None:
 
 
 # noinspection PyBroadException
-def resolve(text: str, context: dict = None, required=False) -> str:
+def resolve(text: str, context: dict = None, required=False, coerce=str) -> str:
     """
     Resolve all sigils found in text, using the specified context.
     If the sigil can't be resolved, return it unchanged unless
@@ -49,6 +49,7 @@ def resolve(text: str, context: dict = None, required=False) -> str:
     :param text: The text containing sigils.
     :param context: Optional dict of context used for resolution.
     :param required: If True, raise SigilError if a sigil can't resolve.
+    :param coerce: Callable used to coerce resolved sigils, default str.
 
     >>> # Resolving sigils using local context:
     >>> context = {"ENV": {"HOST": "localhost"}, "USER": "arthexis"}
@@ -75,7 +76,7 @@ def resolve(text: str, context: dict = None, required=False) -> str:
             if callable(value):
                 raise ValueError("Required arg or node missing.")
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
-            text = text.replace(sigil, repr(value))
+            text = text.replace(sigil, coerce(value) if coerce else value)
         except Exception as ex:
             if required:
                 raise SigilError(sigil) from ex
