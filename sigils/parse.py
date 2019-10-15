@@ -7,7 +7,7 @@ sigil_grammar = r"""
     sigil    : "[" node ("." node)* "]"
     node     : CNAME ["=" arg]
     arg      : sigil
-             | "'" CNAME "'"
+             | "'" /[^']+/ "'"
              | NUMBER
 
     %import common.CNAME

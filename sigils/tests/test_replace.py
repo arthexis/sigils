@@ -1,4 +1,4 @@
-from ..replace import *
+from ..replace import *  # Module under test
 
 
 def test_replace_duplicated():

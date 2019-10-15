@@ -1,4 +1,4 @@
-from ..extract import *
+from ..extract import *  # Module under test
 
 
 def test_extract_deep_nested():

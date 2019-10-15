@@ -18,16 +18,18 @@ class SigilResolver(Transformer):
         obj = None  # The current parent object
         for node in nodes:
             key, arg = node
-            if not obj:
-                # We don't have a parent object: its the first node
+            try:
+                # We don't have a parent object yet: its the first node
                 # Try finding the object in context only
-                try:
-                    obj = self.ctx[key]
-                except KeyError as ex:
-                    logger.error("Key %s not in context", key)
-                    raise ex
-            else:
-                # We have a parent object: not the first node
+                if not obj:
+                    try:
+                        obj = self.ctx[key]
+                    except KeyError as ex:
+                        logger.error("Key %s not in context", key)
+                        raise ex
+                    continue
+
+                # We have a parent object already: this is not the first node
                 # Try the following in order:
                 # 1. Find the object as an item in the parent
                 # 2. Find the object as an attribute of the parent
@@ -54,13 +56,11 @@ class SigilResolver(Transformer):
                             continue
                         logger.error("Key %s not an attribute of %s", key, obj)
                         raise ex
-            if callable(obj):
-                # If the object is callable, call it passing arg.
-                # The returned value becomes the new parent object.
-                obj = obj(arg)
-            elif arg is not None:
-                # If parent is not callable, but arg was provided, try subscripting
-                obj = obj[arg]
+            finally:
+                if callable(obj):
+                    obj = obj(arg)
+                elif arg is not None:
+                    obj = obj[arg]
         return obj
 
     # Flatten nodes (otherwise a Tree is returned)

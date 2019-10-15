@@ -8,7 +8,7 @@ def joiner(data):
     """Return a function that takes a sep and str.joins data."""
 
     def inner(sep):
-        return (sep or "").join(data)
+        return (sep or "").join(str(x) for x in data)
 
     return inner
 
