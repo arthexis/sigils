@@ -21,8 +21,8 @@ def test_resolve_attributes():
 
 
 def test_context_is_required():
-    with pytest.raises(ValueError):
-        result = resolve("[ENV]")
+    with pytest.raises(SigilError):
+        result = resolve("[ENV]", required=True)
 
 
 def test_required_key_not_in_context():
@@ -84,6 +84,6 @@ def test_call_lambda_error():
 
 def test_call_lambda_missing_required_arg():
     set_context("A", lambda x: x)
-    with pytest.raises(SigilError):
-        resolve("[A]", required=True)
+    result = resolve("[A]", required=True)
+    assert result
 

@@ -10,9 +10,18 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["set_context", "resolve"]
 
+
+def _joiner(data):
+    def inner(sep):
+        return (sep or "").join(data)
+    return inner
+
+
 # Global default context
 # Don't modify this directly, use set_context()
-_context = {}
+_context = {
+    "JOIN": _joiner
+}
 
 
 # noinspection PyUnresolvedReferences
@@ -73,8 +82,6 @@ def resolve(text: str, context: dict = None, required=False, coerce=str) -> str:
         try:
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
-            if callable(value):
-                raise ValueError("Required arg or node missing.")
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
             text = text.replace(sigil, coerce(value) if coerce else value)
         except Exception as ex:
