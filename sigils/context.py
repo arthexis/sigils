@@ -9,7 +9,7 @@ def _join(parent, sep):
     return (sep or "").join(str(x) for x in parent)
 
 
-def _hide(parent, mask):
+def _mask(parent, mask):
     """Replaces all characters in a string with a mask."""
     return str(mask or '*') * len(parent)
 
@@ -21,12 +21,18 @@ def _if(parent, val):
     return parent if parent == val else ''
 
 
+def _null(parent, val):
+    """Return nothing regardless of args or parent."""
+    return ''
+
+
 # Global default context
 # Don't modify this directly, use set_context()
 _context = {
     "JOIN": _join,
-    "HIDE": _hide,
+    "MASK": _mask,
     "IF": _if,
+    "NULL": _null,
 }
 
 

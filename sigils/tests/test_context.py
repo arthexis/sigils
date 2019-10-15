@@ -16,9 +16,9 @@ def test_join():
     assert result == "1-2-3"
 
 
-def test_hide():
+def test_mask():
     context = {"A": "password"}
-    result = resolve("[A.HIDE]", context, required=True)
+    result = resolve("[A.MASK]", context, required=True)
     assert result == "********"
 
 
@@ -39,3 +39,7 @@ def test_unary_if():
     result = resolve("[IF='hello']", context)
     assert result == "hello"
 
+
+def test_null():
+    result = resolve("[NULL]")
+    assert result == ""

@@ -89,3 +89,5 @@ class SigilResolver(Transformer):
     @v_args(inline=True)
     def arg(self, value=None):
         return value
+
+    null: bool = lambda self, _: ""

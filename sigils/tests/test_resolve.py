@@ -79,3 +79,8 @@ def test_required_key_not_in_context():
     context = {"USER": "arthexis"}
     with pytest.raises(SigilError):
         result = resolve("[ENV]", context, required=True)
+
+
+def test_null_arg():
+    result = resolve("[IF=NULL]", required=True)
+    assert result == ""

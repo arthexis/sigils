@@ -9,6 +9,8 @@ sigil_grammar = r"""
     arg      : sigil
              | "'" /[^']+/ "'"
              | NUMBER
+             | null
+    null     : "NULL"
 
     %import common.CNAME
     %import common.NUMBER

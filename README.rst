@@ -115,10 +115,13 @@ In *app.py* add the following to register a model in the global context
     class MyAppConfig(AppConfig):
         def ready():
             from .models import MyModel
-            sigils.set_context(
-                "MyModel",
-                lambda parent, pk: MyModel.objects.get(pk=pk)
-            )
+
+            def my_model_lookup(parent, slug):
+                if not parent:
+                    return MyModel.objects.filter(slug=slug)
+                return parent.my_models.get(slug=slug)
+
+            sigils.set_context("MyModel", my_model_lookup)
 
 You can change the lambda to make your model searchable with
 a different argument or manager, here the primary key is used.
