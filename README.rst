@@ -7,7 +7,6 @@ from an user-provided or global context.
 
 This library contains tools to extract, replace and resolve such sigils.
 
-Full Documentation_ at ReadTheDocs.org
 
 .. _Documentation:
 
