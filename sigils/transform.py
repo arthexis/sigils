@@ -54,15 +54,10 @@ class SigilResolver(Transformer):
                             continue
                         logger.error("Key %s not an attribute of %s", key, obj)
                         raise ex
-            if arg:
-                # If and only if an arg was provided for this node
-                # try calling the object with the provided arg, and make
-                # the returned value the new parent object.
-                try:
-                    obj = obj(arg)
-                except TypeError as ex:
-                    logger.error("Key %s is not callable", key)
-                    raise ex
+            if callable(obj):
+                # If the object is callable, call it passing it arg.
+                # The returned value becomes the new parent object.
+                obj = obj(arg)
         return obj
 
     # Flatten nodes (otherwise a Tree is returned)
