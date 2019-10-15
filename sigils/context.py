@@ -4,29 +4,29 @@ from typing import Any
 __all__ = ["set_context"]
 
 
-def joiner(data):
-    """Return a function that takes a sep and str.joins data."""
-
-    def inner(sep):
-        return (sep or "").join(str(x) for x in data)
-
-    return inner
+def _join(parent, sep):
+    """Join parent (a sequence) using sep."""
+    return (sep or "").join(str(x) for x in parent)
 
 
-def hider(data):
+def _hide(parent, mask):
     """Replaces all characters in a string with a mask."""
+    return str(mask or '*') * len(parent)
 
-    def inner(mask):
-        return str(mask) * len(data)
 
-    return inner
+def _if(parent, val):
+    """Return the value only if condition is met."""
+    if parent is None:
+        return val if val else ''
+    return parent if parent == val else ''
 
 
 # Global default context
 # Don't modify this directly, use set_context()
 _context = {
-    "JOIN": joiner,
-    "HIDE": hider,
+    "JOIN": _join,
+    "HIDE": _hide,
+    "IF": _if,
 }
 
 
@@ -44,7 +44,7 @@ def set_context(key: str, value: Any) -> None:
     'System path is /usr/bin'
 
     >>> # Use set_context to create a global function
-    >>> set_context("PERCENT", lambda x: int(float(x) * 100))
+    >>> set_context("PERCENT", lambda parent, arg: int(float(parent) * (arg or 100)))
     >>> context = {"VALUE": 0.5}
     >>> resolve("The percent is [VALUE.PERCENT]%", context)
     'The percent is 50%'

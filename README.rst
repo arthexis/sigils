@@ -117,7 +117,7 @@ In *app.py* add the following to register a model in the global context
             from .models import MyModel
             sigils.set_context(
                 "MyModel",
-                lambda pk: MyModel.objects.get(pk=pk)
+                lambda parent, pk: MyModel.objects.get(pk=pk)
             )
 
 You can change the lambda to make your model searchable with

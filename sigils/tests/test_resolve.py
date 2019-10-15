@@ -46,19 +46,19 @@ def test_no_sigils_found():
 
 
 def test_call_lambda_missing_required_arg():
-    context = {"A": lambda x: x}
+    context = {"A": lambda p, x: x}
     result = resolve("[A]", context, required=True)
     assert result
 
 
 def test_call_lambda_error():
-    context = {"A": lambda x: x / 0}
+    context = {"A": lambda p, x: x / 0}
     with pytest.raises(SigilError):
         resolve("[A='Test']", context, required=True)
 
 
 def test_call_lambda():
-    context = {"A": lambda x: x}
+    context = {"A": lambda p, x: x}
     result = resolve("[A='Test']", context, required=True)
     assert result == "Test"
 
