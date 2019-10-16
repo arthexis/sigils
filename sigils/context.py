@@ -4,26 +4,33 @@ from typing import Any
 __all__ = ["set_context"]
 
 
-def _join(parent, sep):
+def _join(parent, arg):
     """Join parent (a sequence) using sep."""
-    return (sep or "").join(str(x) for x in parent)
+    return (arg or "").join(str(x) for x in parent)
 
 
-def _mask(parent, mask):
+def _mask(parent, arg):
     """Replaces all characters in a string with a mask."""
-    return str(mask or '*') * len(parent)
+    return str(arg or '*') * len(parent)
 
 
-def _if(parent, val):
+def _if(parent, arg):
     """Return the value only if condition is met."""
     if parent is None:
-        return val if val else ''
-    return parent if parent == val else ''
+        return arg if arg else ''
+    return parent if parent == arg else ''
 
 
-def _null(parent, val):
+def _null(parent, arg):
     """Return nothing regardless of args or parent."""
     return ''
+
+
+def _add(parent, arg):
+    """Add the values of the parent and the param."""
+    if arg:
+        return parent + arg
+    return sum(parent)
 
 
 # Global default context
@@ -33,6 +40,7 @@ _context = {
     "MASK": _mask,
     "IF": _if,
     "NULL": _null,
+    "ADD": _add,
 }
 
 
