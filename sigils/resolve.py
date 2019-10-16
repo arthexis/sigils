@@ -38,13 +38,13 @@ def resolve(
     'Connect to localhost as arthexis'
     """
 
-    coerce = coerce or str
     context = {**(default or {}), **(context or {})}
     if not context:
         raise ValueError("context is required")
     if text.startswith('[') and text.endswith(']'):
-        sigils = {text}  # Don't waste time with extract
+        sigils = {text}  # Don't extract, coerce optional
     else:
+        coerce = coerce or str       # Coerce can't be none
         sigils = set(extract(text))  # Extract is necessary
     if not sigils:
         logger.debug("No sigils found in '%s'", text)
@@ -57,6 +57,8 @@ def resolve(
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
+            if coerce is None:
+                return value
             text = text.replace(sigil, coerce(value))
         except Exception as ex:
             if required:

@@ -48,7 +48,7 @@ def test_no_sigils_found():
 def test_call_lambda_missing_required_arg():
     context = {"A": lambda p, x: x}
     result = resolve("[A]", context, required=True)
-    assert result
+    assert result is None
 
 
 def test_call_lambda_error():

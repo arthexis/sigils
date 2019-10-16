@@ -48,10 +48,10 @@ def test_null():
 def test_add_binary():
     context = {"A": 2, "B": 3}
     result = resolve("[A.ADD=[B]]", context, required=True)
-    assert result == "5"
+    assert result == 5
 
 
 def test_add_unary():
     context = {"A": [1, 2, 3]}
     result = resolve("[A.ADD]", context, required=True)
-    assert result == "6"
+    assert result == 6

@@ -9,7 +9,7 @@ def replace(text: str, pattern: str) -> Tuple[str, List[str]]:
     """
     Replace all sigils in the text with another pattern.
     Returns the replaced text and a list of sigils in found order.
-    This will not resolve the sigils.
+    This will not resolve the sigils by default.
 
     :param text: The text with the sigils to be replaced.
     :param pattern: A string used to replace the sigils with.
