@@ -7,12 +7,12 @@ with open(path.join(base_dir, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='sigils',
-    version='0.0.3',
+    version='0.0.4',
     description='Extract, resolve and replace [SIGILS] embedded in text.',
     long_description=long_description,
     long_description_content_type='text/x-rst',
     url='http://github.com/arthexis/sigils',
-    download_url='https://github.com/arthexis/sigils/archive/v0.0.3.tar.gz',
+    download_url='https://github.com/arthexis/sigils/archive/v0.0.4.tar.gz',
     author='Rafael Guillén',
     author_email='arthexis@gmail.com',
     license='MIT',
