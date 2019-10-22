@@ -41,6 +41,13 @@ def _len(parent, arg):
     return len(parent)
 
 
+def _fold(parent, arg):
+    """Apply casefold to parent, useful for string comparisons."""
+    if arg:
+        raise ValueError("Unexpected argument for LEN")
+    return str(parent).casefold()
+
+
 # Global default context
 # Don't modify this directly, use set_context()
 _default_context = {
@@ -50,6 +57,7 @@ _default_context = {
     "NULL": _null,
     "ADD": _add,
     "LEN": _len,
+    "FOLD": _fold,
 }
 
 # Thread local context

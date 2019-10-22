@@ -67,3 +67,9 @@ def test_len():
     context = {"A": "Hello"}
     result = resolve("[A.LEN]", context, required=True, coerce=None)
     assert result == 5
+
+
+def test_fold():
+    context = {"A": "Hello"}
+    result = resolve("[A.FOLD]", context, required=True, coerce=None)
+    assert result == "hello"
