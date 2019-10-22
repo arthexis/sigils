@@ -61,3 +61,9 @@ def test_strip():
     context = {"A": "   some text  "}
     result = resolve("[A.STRIP]", context, required=True)
     assert result == "some text"
+
+
+def test_len():
+    context = {"A": "Hello"}
+    result = resolve("[A.LEN]", context, required=True, coerce=None)
+    assert result == 5

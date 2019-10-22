@@ -37,7 +37,7 @@ def resolve(
     """
 
     context = ChainMap(_context, context)
-    sigils = set(extract(text))  # Extract is necessary
+    sigils = set(extract(text))
     results = []
 
     if not sigils:
@@ -50,15 +50,16 @@ def resolve(
             # each sigil in isolation and in a single pass
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
-            results.append(value)
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
             if coerce is not None:
                 text = text.replace(sigil, coerce(value))
+            else:
+                results.append(value)
         except Exception as ex:
             if required:
                 raise SigilError(sigil) from ex
             logger.debug("Sigil %s not resolved", sigil)
 
-    if coerce is None and results:
+    if results:
         return results if len(results) > 1 else results[0]
     return text

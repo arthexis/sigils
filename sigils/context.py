@@ -31,9 +31,14 @@ def _null(parent, arg):
 
 def _add(parent, arg):
     """Add the values of the parent and the param."""
+    return parent + arg if arg else sum(parent)
+
+
+def _len(parent, arg):
+    """Return the length of parent."""
     if arg:
-        return parent + arg
-    return sum(parent)
+        raise ValueError("Unexpected argument for LEN")
+    return len(parent)
 
 
 # Global default context
@@ -44,6 +49,7 @@ _default_context = {
     "IF": _if,
     "NULL": _null,
     "ADD": _add,
+    "LEN": _len,
 }
 
 # Thread local context
@@ -76,5 +82,5 @@ def set_context(key: str, value: Any) -> None:
     'The percent is 50%'
     """
 
-    global _context, _thread_locals
-    _context[key] = value
+    global _thread_locals
+    _thread_locals.context[key] = value
