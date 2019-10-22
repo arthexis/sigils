@@ -79,3 +79,8 @@ def test_required_key_not_in_context():
 def test_null_arg():
     result = resolve("[IF=NULL]", required=True)
     assert result == ""
+
+
+def test_embedded_resolve():
+    result = resolve("[A] World!", {"A": "Hello"})
+    assert result == "Hello World!"
