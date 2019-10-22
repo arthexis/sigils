@@ -18,7 +18,7 @@ def resolve(
             text: str,
             context: Optional[dict] = None,
             required: bool = False,
-            coerce: Callable = str,
+            coerce: Optional[Callable] = str,
         ) -> str:
     """
     Resolve all sigils found in text, using the specified context.
