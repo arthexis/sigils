@@ -19,11 +19,6 @@ def test_resolve_attributes():
     assert result == hostname
 
 
-def test_context_is_required():
-    with pytest.raises(ValueError):
-        result = resolve("[ENV]", required=True, default=None)
-
-
 def test_suppress_errors_default():
     context = {"USER": "arthexis"}
     sigil = "[ENV]"

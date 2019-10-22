@@ -1,4 +1,7 @@
+import threading
 from typing import Any
+from collections import ChainMap
+from contextlib import contextmanager
 
 
 __all__ = ["set_context"]
@@ -35,7 +38,7 @@ def _add(parent, arg):
 
 # Global default context
 # Don't modify this directly, use set_context()
-_context = {
+_default_context = {
     "JOIN": _join,
     "MASK": _mask,
     "IF": _if,
@@ -43,11 +46,20 @@ _context = {
     "ADD": _add,
 }
 
+# Thread local context
+_thread_locals = threading.local()
+_thread_locals.context = {}
+
+# Using a ChainMap allows us to use multiple layers of context
+# while avoiding duplication of the default context.
+_context = ChainMap(_default_context, _thread_locals.context)
+
 
 # noinspection PyUnresolvedReferences
 def set_context(key: str, value: Any) -> None:
     """
     Set a global default context for resolve.
+    This will only apply to the current thread.
 
     :param key: String key used to lookup context.
     :param value: The context value, usually a callable or instance.
@@ -64,5 +76,5 @@ def set_context(key: str, value: Any) -> None:
     'The percent is 50%'
     """
 
-    global _context
+    global _context, _thread_locals
     _context[key] = value

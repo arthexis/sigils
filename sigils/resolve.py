@@ -1,3 +1,4 @@
+from collections import ChainMap
 import logging
 from typing import Any, Callable, Optional
 
@@ -18,19 +19,16 @@ def resolve(
             context: Optional[dict] = None,
             required: bool = False,
             coerce: Callable = None,
-            default: Optional[dict] = _context,
         ) -> str:
     """
     Resolve all sigils found in text, using the specified context.
     If the sigil can't be resolved, return it unchanged unless
     required is True, in which case raise SigilError.
 
-    :param default:
     :param text: The text containing sigils.
     :param context: Optional dict of context used for resolution.
     :param required: If True, raise SigilError if a sigil can't resolve.
     :param coerce: Callable used to coerce resolved sigils, default str.
-    :param default: Default context to use, set to None to disable.
 
     >>> # Resolving sigils using local context:
     >>> context = {"ENV": {"HOST": "localhost"}, "USER": "arthexis"}
@@ -38,14 +36,10 @@ def resolve(
     'Connect to localhost as arthexis'
     """
 
-    context = {**(default or {}), **(context or {})}
-    if not context:
-        raise ValueError("context is required")
-    if text.startswith('[') and text.endswith(']'):
-        sigils = {text}  # Don't extract, coerce optional
-    else:
-        coerce = coerce or str       # Coerce can't be none
-        sigils = set(extract(text))  # Extract is necessary
+    context = ChainMap(_context, context)
+    sigils = set(extract(text))  # Extract is necessary
+    results = []
+
     if not sigils:
         logger.debug("No sigils found in '%s'", text)
         return text  # Not an error, just do nothing
@@ -56,12 +50,15 @@ def resolve(
             # each sigil in isolation and in a single pass
             tree = parser.parse(sigil)
             value = SigilResolver(context).transform(tree).children[0]
+            results.append(value)
             logger.debug("Sigil %s resolved to '%s'", sigil, value)
-            if coerce is None:
-                return value
-            text = text.replace(sigil, coerce(value))
+            if coerce is not None:
+                text = text.replace(sigil, coerce(value))
         except Exception as ex:
             if required:
                 raise SigilError(sigil) from ex
             logger.debug("Sigil %s not resolved", sigil)
+
+    if coerce is None and results:
+        return results if len(results) > 1 else results[0]
     return text

@@ -1,4 +1,5 @@
 import logging
+from typing import ChainMap
 
 from lark import Transformer, v_args
 
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class SigilResolver(Transformer):
 
-    def __init__(self, context: dict = None):
+    def __init__(self, context: ChainMap):
         super().__init__()
         self.ctx = context or {}
 
@@ -23,8 +24,7 @@ class SigilResolver(Transformer):
             # Try finding the object in context only
             if not parent:
                 try:
-                    parent = self.ctx[key]
-                    if callable(parent):
+                    if callable(parent := self.ctx[key]):
                         parent = parent(None, arg)
                 except KeyError as ex:
                     logger.error("Key %s not in context", key)
@@ -49,16 +49,15 @@ class SigilResolver(Transformer):
                     obj = None
                     raise ex
                 except TypeError as ex:
-                    _key = key.casefold()
-                    if key.startswith("_"):
+                    folded = key.casefold()
+                    if folded.startswith("_"):
                         obj = None
                         raise AttributeError("Key %s cannot be private", key)
                     try:
-                        obj = getattr(parent, _key)
+                        obj = getattr(parent, folded)
                         continue
                     except AttributeError as ex:
-                        func = self.ctx.get(key, None)
-                        if callable(func):
+                        if callable(func := self.ctx.get(key, None)):
                             logger.debug("Apply %s to %s", func, obj)
                             called = True
                             obj = func(parent, arg)
@@ -71,7 +70,12 @@ class SigilResolver(Transformer):
                 # If not callable, but arg was provided, subscript
                 if not called:
                     if callable(obj):
-                        obj = obj(parent, arg)
+                        if hasattr(obj, '__self__'):
+                            # Already a bound method, don't pass parent
+                            obj = obj(arg)
+                        else:
+                            # Unbound method or function, pass parent
+                            obj = obj(parent, arg)
                     elif arg is not None:
                         obj = obj[arg]
 
