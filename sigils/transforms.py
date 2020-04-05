@@ -2,7 +2,9 @@ import logging
 import threading
 import contextlib
 import collections
-from typing import Mapping, Union, Tuple, Text, Iterator
+from typing import (
+    Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional
+)
 
 from . import parsing, filters, exceptions
 
@@ -45,9 +47,11 @@ def context(**kwargs) -> None:
 
 # noinspection PyBroadException,PyDefaultArgument
 def resolve(
-            text: str,
-            required: bool = False,
-        ) -> str:
+    text: str,
+    serializer: Callable[[Any], str] = str,
+    raise_errors: bool = False,
+    default: Optional[str] = "",
+) -> str:
     """
     Resolve all sigils found in text, using the local context.
 
@@ -55,7 +59,9 @@ def resolve(
     required is True, in which case raise SigilError.
 
     :param text: The text containing sigils.
-    :param required: If True, raise SigilError if a sigil can't be resolved.
+    :param raise_errors: If True, raise SigilError if a sigil can't be resolved.
+    :param serializer: Function used to serialize the sigil value, defaults to str.
+    :param default: Value to use when returned value is None, defaults to "".
 
     >>> # Resolving sigils using context:
     >>> with context(ENV={"HOST": "localhost"}, USER="arthexis"}):
@@ -70,7 +76,7 @@ def resolve(
         return text  # Not an error, just do nothing
 
     results = []
-    logger.debug(f"Extracted sigils: {sigils}")
+    logger.debug(f"Extracted sigils: {sigils}.")
     for sigil in sigils:
         try:
             # By using a lark transformer, we parse and resolve
@@ -79,11 +85,14 @@ def resolve(
             transformer = parsing.ContextTransformer(_local.ctx)
             value = transformer.transform(tree).children[0]
             logger.debug(f"Sigil {sigil} resolved to '{value}'.")
-            text = text.replace(sigil, str(value))
+            if value is None:
+                text = text.replace(sigil, default)
+            else:
+                text = text.replace(sigil, serializer(value))
         except Exception as ex:
-            if required:
+            if raise_errors:
                 raise exceptions.SigilError(sigil) from ex
-            logger.debug(f"Sigil {sigil} not resolved")
+            logger.debug(f"Sigil {sigil} not resolved.")
 
     if results:
         return results if len(results) > 1 else results[0]
@@ -92,7 +101,7 @@ def resolve(
 
 def replace(
         text: str,
-        pattern: Union[Text, Iterator]
+        pattern: Union[Text, Iterator],
 ) -> Tuple[str, Tuple[str]]:
     """
     Replace all sigils in the text with another pattern.
