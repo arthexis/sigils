@@ -2,8 +2,10 @@
   <dictionary name="arthe">
     <words>
       <w>arthexis</w>
+      <w>casefold</w>
       <w>sigil</w>
       <w>sigils</w>
+      <w>threadlocal</w>
     </words>
   </dictionary>
 </component>

@@ -2,8 +2,9 @@ Sigils
 ======
 
 A **sigil** is a token embedded in text, used as a magical placeholder
-for a future value. When resolved, the actual value will be extracted
-from an user-provided or global context.
+for a future value. When resolved, the actual value can be extracted
+from an user-provided thread-local context and replaced in the text
+or extracted from it.
 
 This library contains tools to extract, replace and resolve such sigils.
 
@@ -29,13 +30,16 @@ A typical sigil has one of the following forms:
 .. code-block:: text
 
     [USERNAME]
-    [SETTINGS.BASE_DIR]
+    [SETTING.BASE_DIR]
     [MODEL='natural-key'.FIELD]
-    [MODEL.USR=[USERNAME].STATUS]
+    [MODEL="natural-key".FIELD]
+    [ENV=[TIER].HOST]
+    [MODEL.USER=[USERNAME].STATUS]
 
 Each sigil is a list of **nodes** separated by a dot.
-Nodes can be standalone or parametrized. If parametrized, they can take one
-**argument** by using the equals sign. The argument can be a number, a single-quoted string,
+Nodes can be standalone or parametrized.
+If parametrized, they can take an **argument** using the
+equals sign. The argument can be a number, a quoted string,
 or another sigil.
 
 .. code-block:: text
@@ -48,26 +52,23 @@ Sigils used as arguments can be nested to any depth.
 Resolving Sigils
 ----------------
 
-The *resolve* function will replace any sigils found in a string, given a context:
+The *resolve* function will replace any sigils found in a string,
+given a context:
 
 .. code-block:: python
 
     from sigils import resolve
 
-    text = "[USERNAME]: The BASE_DIR is [SETTINGS.BASE_DIR]."
-    context = {
-        "USERNAME": "arthexis",
-        "SETTINGS": {"BASE_DIR": "/home/arth/webapp"},
-    }
-    result = list(resolve(text, context))
-    assert result == "arthexis: The BASE_DIR is /home/arth/webapp"
+    with context(
+        USERNAME="arthexis",
+        SETTING={"BASE_DIR": "/home/arth/webapp"},
+    ):
+        result = resolve("[USERNAME]: [SETTINGS.BASE_DIR].")
+        assert result == "arthexis: /home/arth/webapp"
 
-
-Note that *resolve* returns a generator, so you will need to pass
-it to *list* or some other kind os sequence, or iterate it in a loop or comprehension.
-
-All keys in the context mapping should be strings. Values can be anything, but usually it
-will be a string, another dict, a callable or an instance with public fields:
+All keys in the context mapping should be strings.
+Values can be anything, but usually it will be a string,
+another dict, a callable or an instance with public fields:
 
 .. code-block:: python
 
@@ -82,8 +83,10 @@ will be a string, another dict, a callable or an instance with public fields:
         "RNG": lambda _: randint(),      # [RNG]
     }
 
-Instead of passing the context explicitly, a global default context can be set
-to be used by all calls to *resolve*, you can see an example in the Django integration below.
+Instead of passing the context explicitly,
+a global default context can be set
+to be used by all calls to *resolve*,
+you can see an example in the Django integration below.
 
 
 
@@ -101,8 +104,8 @@ Create *<your_app>/templatetags/sigils.py* with the following code:
     register = template.Library()
 
     @register.simple_tag
-    def resolve(text, **context):
-        return sigils.resolve(text, context)
+    def resolve(text):
+        return sigils.resolve(text)
 
 In *app.py* add the following to register a model in the global context
 (rename MyModel to the name of your model class):
