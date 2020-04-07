@@ -2,6 +2,7 @@ import logging
 import threading
 import contextlib
 import collections
+import configparser
 from typing import (
     Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional
 )
@@ -31,16 +32,22 @@ _local = ThreadLocal()
 
 # noinspection PyUnresolvedReferences
 @contextlib.contextmanager
-def context(**kwargs) -> None:
+def context(*args, **kwargs) -> None:
     """Update the local context used by resolve.
+
+    :param args: A tuple of context sources.
     :param kwargs: A mapping of context selectors to Resolvers.
 
+    >>> # Add to context using kwargs
     >>> with context(TEXT="hello world") as ctx:
     >>>     assert ctx["TEXT"] == "hello world"
     """
     global _local
 
     _local.ctx = _local.ctx.new_child(kwargs)
+    for arg in args:
+        for section, config in arg.items():
+            _local.ctx[section] = config
     yield _local.ctx
     _local.ctx = _local.ctx.parents
 
