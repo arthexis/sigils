@@ -10,3 +10,7 @@ def test_join_list():
 def test_sys_context_env_path():
     import os
     assert resolve("[SYS.ENV.PATH]") == os.getenv("PATH")
+
+
+def test_sys_uuid_length():
+    assert len(resolve("[SYS.UUID]")) == 32

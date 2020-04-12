@@ -1,8 +1,13 @@
 from ..parsing import *  # Module under test
 
 
-def test_extract_deep_nested():
+def test_extract_single_deep_nested():
     sigil = "[ENV=[USR=[CURRENT].DEFAULT_ENV].APP=[APP=[ACTIVE]]]"
-    text = f"This text has a sigil {sigil} embedded on it"
-    results = list(extract(text))
-    assert results == [sigil]
+    text = f"-- {sigil} --"
+    assert set(extract(text)) == {sigil}
+
+
+def test_ignore_whitespace():
+    sigil = "[ ENV . HELP ]"
+    text = f"-- {sigil} --"
+    assert set(extract(text)) == {sigil}

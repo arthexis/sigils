@@ -122,3 +122,18 @@ def test_cache_value_is_not_saved():
         resolve("[USER]", cache=False)
         with context(USER="joe"):
             assert resolve("[USER]") == "joe"
+
+
+def test_resolve_simple_whitespace():
+    with context({"ENV": "local"}):
+        assert resolve("[ ENV ]") == "local"
+
+
+def test_resolve_dotted_whitespace():
+    with context({"ENV": {"USER": "admin"}}):
+        assert resolve("[ ENV  .  USER ]") == "admin"
+
+
+def test_resolve_recursive_one_level():
+    with context(Y="[X]", X=10):
+        assert resolve("[Y]", recursion_limit=1) == "10"

@@ -3,6 +3,7 @@ import logging
 import threading
 import contextlib
 import collections
+import uuid
 from typing import (
     Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional
 )
@@ -10,7 +11,14 @@ from typing import (
 # noinspection PyUnresolvedReferences
 from lru import LRU
 
-from . import parsing, filters, exceptions
+# Try to import django.utils.timezone as datetime if exists
+# If it doesn't, just normal datetime
+try:
+    from django.utils import timezone as datetime
+except ImportError:
+    from datetime import datetime
+
+from . import parsing, exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +46,26 @@ class System:
     def env(self):
         return self._env
 
+    @property
+    def now(self):
+        return datetime.now()
+
+    @property
+    def today(self):
+        return datetime.today()
+
+    @property
+    def uuid(self):
+        return str(uuid.uuid4()).replace('-', '')
+
 
 # Thread local context
 class ThreadLocal(threading.local):
     def __init__(self):
         self.ctx: Mapping = collections.ChainMap({
-            "JOIN": filters.join,
-            "SYS": System()
+            "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
+            "SYS": System(),
+            "NUMBER": lambda x: float(x) if "." in x else int(x)
         })
         self.lru = LRU(128)
 
@@ -84,12 +105,12 @@ DEFAULT = "default"
 
 # noinspection PyBroadException,PyDefaultArgument
 def resolve(
-    text: str,
-    serializer: Callable[[Any], str] = str,
-    on_error: str = DEFAULT,
-    default: Optional[str] = "",
-    recursion_limit: int = 20,
-    cache: bool = True,
+        text: str,
+        serializer: Callable[[Any], str] = str,
+        on_error: str = DEFAULT,
+        default: Optional[str] = "",
+        recursion_limit: int = 20,
+        cache: bool = True,
 ) -> str:
     """
     Resolve all sigils found in text, using the local context.
@@ -182,10 +203,28 @@ def replace(
     """
 
     sigils = list(parsing.extract(text))
-    use_next = hasattr(pattern, "__next__")
+    n = hasattr(pattern, "__next__")
     for sigil in set(sigils):
-        if use_next:
-            text = text.replace(sigil, str(next(pattern)))
-        else:
-            text = text.replace(sigil, pattern)
+        text = text.replace(sigil, str(next(pattern)) if n else pattern)
     return text, tuple(sigils)
+
+
+class Sigil:
+    """Encapsulate a string that can contain sigils.
+    When an instance of this class has its __str__ method called,
+    the text gets passed through resolve automatically.
+    """
+
+    def __init__(self, original: str, **kwargs):
+        self.original = original
+        self.kwargs = kwargs
+
+    def __str__(self):
+        """Resolve the sigil."""
+        return resolve(self.original, **self.kwargs)
+
+    def __call__(self, *args, **kwargs):
+        """Send all args and kwargs to context, then resolve."""
+        with context(*args, **kwargs):
+            return str(self)
+
