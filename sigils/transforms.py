@@ -29,7 +29,8 @@ __all__ = [
     "RAISE",
     "DEFAULT",
     "CONTINUE",
-    "REMOVE"
+    "REMOVE",
+    "Sigil",
 ]
 
 
@@ -65,7 +66,10 @@ class ThreadLocal(threading.local):
         self.ctx: Mapping = collections.ChainMap({
             "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
             "SYS": System(),
-            "NUMBER": lambda x: float(x) if "." in x else int(x)
+            "NUMBER": lambda x: float(x) if "." in x else int(x),
+            "LOWER": lambda x: str(x).lower(),
+            "UPPER": lambda x: str(x).upper(),
+            "FOLD": lambda x: str(x).casefold(),
         })
         self.lru = LRU(128)
 
@@ -149,12 +153,12 @@ def resolve(
             # each sigil in isolation and in a single pass
             if cache and sigil in _local.lru:
                 value = _local.lru[sigil]
-                logger.debug(f"Sigil {sigil} value from cache '{value}'.")
+                logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
             else:
                 tree = parsing.parse(sigil)
                 transformer = parsing.ContextTransformer(_local.ctx)
                 value = transformer.transform(tree).children[0]
-                logger.debug(f"Sigil {sigil} resolved to '{value}'.")
+                logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
                 if cache:
                     _local.lru[sigil] = value
             if value is None:
@@ -177,7 +181,7 @@ def resolve(
                 text = text.replace(sigil, "")
             elif on_error == DEFAULT:
                 text = text.replace(sigil, default)
-            logger.debug(f"Sigil {sigil} not resolved.")
+            logger.debug("Sigil '%s' not resolved.", sigil)
 
     if results:
         return results if len(results) > 1 else results[0]

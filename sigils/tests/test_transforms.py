@@ -137,3 +137,8 @@ def test_resolve_dotted_whitespace():
 def test_resolve_recursive_one_level():
     with context(Y="[X]", X=10):
         assert resolve("[Y]", recursion_limit=1) == "10"
+
+
+def test_sigil_helper_class():
+    sigil = Sigil("Hello [PLACE]")
+    assert sigil(PLACE="World") == "Hello World"

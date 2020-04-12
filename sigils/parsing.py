@@ -1,6 +1,6 @@
 import logging
-import inspect
-from typing import Iterator, Mapping
+import io
+from typing import Iterator, Mapping, Union, TextIO
 
 import lark
 
@@ -28,7 +28,11 @@ _parser = lark.Lark(GRAMMAR)
 parse = _parser.parse
 
 
-def extract(text: str, left: str = "[", right: str = "]") -> Iterator[str]:
+def extract(
+        text: Union[str, TextIO],
+        left: str = "[",
+        right: str = "]"
+) -> Iterator[str]:
     """Generator that extracts top-level sigils from text.
 
     :param text: The text to extract the sigils from.
@@ -51,7 +55,9 @@ def extract(text: str, left: str = "[", right: str = "]") -> Iterator[str]:
 
     buffer = []
     depth = 0
-    for char in text:
+    if isinstance(text, str):
+        text = io.StringIO(text)
+    while char := text.read(1):
         if char == left:
             depth += 1
         if depth > 0:
