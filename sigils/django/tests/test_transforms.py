@@ -74,3 +74,9 @@ def test_model_context_get_by_natural_key():
     UserModel(pk=3, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
         assert resolve("[USR='arthexis'.ALIAS]") == 'admin'
+
+
+def test_resolve_from_file():
+    with context(ENV={"HOST": "local"}):
+        with open("tests/data/sample.txt") as fp:
+            assert resolve(fp) == 'Server: local'

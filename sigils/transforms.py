@@ -5,7 +5,7 @@ import contextlib
 import collections
 import uuid
 from typing import (
-    Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional
+    Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
 )
 
 # noinspection PyUnresolvedReferences
@@ -109,7 +109,7 @@ DEFAULT = "default"
 
 # noinspection PyBroadException,PyDefaultArgument
 def resolve(
-        text: str,
+        text: Union[str, TextIO],
         serializer: Callable[[Any], str] = str,
         on_error: str = DEFAULT,
         default: Optional[str] = "",
@@ -139,6 +139,8 @@ def resolve(
     'Connect to localhost as arthexis'
     """
 
+    if not isinstance(text, str):
+        text = text.read()
     sigils = set(parsing.extract(text))
 
     if not sigils:
