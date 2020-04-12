@@ -1,4 +1,5 @@
 import logging
+import inspect
 from typing import Iterator, Mapping
 
 import lark
@@ -62,14 +63,20 @@ def extract(text: str, left: str = "[", right: str = "]") -> Iterator[str]:
                     buffer.clear()
 
 
-def _get(obj, key):
+def _try_get_item(obj, key):
     try:
         return obj[key]
     except (KeyError, TypeError):
         return None
 
 
-def _manager(model):
+def _try_call(func, arg, *args):
+    if callable(func):
+        logger.debug(f"Callable, try with {arg=} {args=}.")
+        return func(arg, *args) if arg else func(*args)
+
+
+def _try_manager(model):
     return getattr(model, "objects", None)
 
 
@@ -95,49 +102,56 @@ class ContextTransformer(lark.Transformer):
         logger.debug(f"Resolving node stack {stack}.")
         # Process the first node
         name, param = stack.pop()
-        target = self._ctx_lookup(name)
-        if manager := _manager(target):
+        if not (target := self._ctx_lookup(name)):
+            logger.debug(f"Root '{name}' not found in context.")
+            return
+        if manager := _try_manager(target):
             logger.debug("Found 'objects' attribute, treat as Model.")
             if param:
                 logger.debug(f"Search by pk={param}")
                 if instance := manager.get(pk=param):
                     logger.debug(f"Found instance with pk={param}.")
                     target = instance
-                else:
-                    if instance := manager.get_by_natural_key(param):
-                        logger.debug(f"Found instance with natural key: {param}.")
-                        target = instance
+                elif instance := manager.get_by_natural_key(param):
+                    logger.debug(f"Found instance with natural key: {param}.")
+                    target = instance
             else:
                 try:
                     logger.debug("Lookahead into the next node.")
                     name, param = stack.pop()
                     if param:
                         target = manager.get(**{name.casefold(): param})
+                    else:
+                        stack.append((name, param))
                 except IndexError:
                     pass  # Nothing to append back, pop failed
                 except RuntimeError as ex:
                     stack.append((name, param))
         elif callable(target):
-            target = target(param) if param else target()
+            target = _try_call(target, param)
         elif param:
-            if value := _get(target, param):
+            if isinstance(param, int):
+                param -= 1
+            if value := _try_get_item(target, param):
                 logger.debug(f"Lookup param '{param}' found.")
                 target = value
         # Process additional nodes after the first
         while stack:
             name, param = stack.pop()
-            if field := getattr(target, name.casefold(), None):
-                logger.debug(f"Field {name} found in {target}.")
-                target = field
+            if field := _try_get_item(target, name):
+                # This finds items only (not attributes)
+                logger.debug(f"Field (exact) {name} found in {target}.")
+                target = _try_call(field, param) or field
+            elif field := getattr(target, name.casefold(), None):
+                # Casefold is used to find Model fields, properties and methods
+                logger.debug(f"Field (casefold) {name} found in {target}.")
+                target = _try_call(field, param) or field
+            elif _filter := self._ctx_lookup(name):
+                logger.debug(f"Filter {name} found in context.")
+                target = _try_call(_filter, target, param)
             else:
-                if not param:
-                    target = target[name]
-                else:
-                    if func := self._ctx_lookup(name):
-                        logger.debug(f"Filter {name} found in context.")
-                        target = func
-            if callable(target):
-                target = target(param) if param else target()
+                logger.debug("Unable to consume complete sigil.")
+                return
         return target
 
     # Flatten nodes (otherwise a Tree is returned)

@@ -6,7 +6,7 @@ from ..exceptions import SigilError
 
 def test_sigil_with_simple_context():
     with context(USER="arthexis"):
-        assert resolve("[USER]", raise_errors=True) == "arthexis"
+        assert resolve("[USER]") == "arthexis"
 
 
 def test_sigil_with_mapping_context():
@@ -28,14 +28,19 @@ def test_class_static_attribute():
         assert resolve("[ENT.CODE]") == "Hello"
 
 
-def test_sigil_with_index():
+def test_sigil_with_natural_index():
     with context(ENV=["hello", "world"]):
-        assert resolve("[ENV=1]") == "world"
+        assert resolve("[ENV=2]") == "world"
 
 
-def test_suppress_errors_by_default():
+def test_replace_missing_sigils_with_default():
     with context(USER="arthexis"):
-        assert resolve("[NOT_USER]") == "[NOT_USER]"
+        assert resolve("[NOT_USER]", default="ERROR") == "ERROR"
+
+
+def test_remove_missing_sigils():
+    with context(USER="arthexis"):
+        assert not resolve("[NOT_USER]", on_error=REMOVE)
 
 
 def test_attributes_casefold():
@@ -55,40 +60,40 @@ def test_no_sigils_in_text():
 
 def test_call_lambda_same():
     with context(SAME=lambda arg: arg):
-        assert resolve("[SAME='Test']", raise_errors=True) == "Test"
+        assert resolve("[SAME='Test']") == "Test"
 
 
 def test_call_lambda_same_alt_quotes():
     with context(SAME=lambda arg: arg):
-        assert resolve('[SAME="Test"]', raise_errors=True) == "Test"
+        assert resolve('[SAME="Test"]') == "Test"
 
 
 def test_call_lambda_reverse():
     with context(REVERSE=lambda arg: arg[::-1]):
-        assert resolve("[REVERSE='Test']", raise_errors=True) == "tseT"
+        assert resolve("[REVERSE='Test']") == "tseT"
 
 
 def test_call_lambda_error():
     with context(DIVIDE_BY_ZERO=lambda arg: arg / 0):
         with pytest.raises(SigilError):
-            resolve("[DIVIDE_BY_ZERO=1]", raise_errors=True)
+            resolve("[DIVIDE_BY_ZERO=1]", on_error=RAISE)
 
 
 def test_item_subscript():
     with context(A={"B": "C"}):
-        assert resolve("[A.B]", raise_errors=True) == "C"
+        assert resolve("[A.B]") == "C"
 
 
 def test_item_subscript_key_not_found():
     with context(A={"B": "C"}):
         with pytest.raises(SigilError):
-            resolve("[A.C]", raise_errors=True)
+            resolve("[A.C]", on_error=RAISE)
 
 
 def test_required_key_not_in_context():
     with context(USER="arthexis"):
         with pytest.raises(SigilError):
-            resolve("[ENV]", raise_errors=True)
+            resolve("[ENV]", on_error=RAISE)
 
 
 def test_replace_duplicated():
@@ -96,3 +101,24 @@ def test_replace_duplicated():
     text, sigils = replace(text, "%s")
     assert text == "User: %s, Manager: %s, Company: %s"
     assert sigils == ("[USER]", "[USER]", "[ORG]")
+
+
+def test_cache_value_is_used():
+    with context(USER="arthexis"):
+        resolve("[USER]")
+        with context(USER="joe"):
+            assert resolve("[USER]") == "arthexis"
+
+
+def test_cache_value_is_not_used():
+    with context(USER="arthexis"):
+        resolve("[USER]")
+        with context(USER="joe"):
+            assert resolve("[USER]", cache=False) == "joe"
+
+
+def test_cache_value_is_not_saved():
+    with context(USER="arthexis"):
+        resolve("[USER]", cache=False)
+        with context(USER="joe"):
+            assert resolve("[USER]") == "joe"

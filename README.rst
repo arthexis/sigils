@@ -57,7 +57,7 @@ given a context:
 
 .. code-block:: python
 
-    from sigils import resolve
+    from sigils import resolve, context
 
     with context(
         USERNAME="arthexis",
@@ -67,6 +67,7 @@ given a context:
         assert result == "arthexis: /home/arth/webapp"
 
 All keys in the context mapping should be strings.
+The use of uppercase keys is recommended but not required.
 Values can be anything, but usually it will be a string,
 another dict, a callable or an instance with public fields:
 
@@ -75,19 +76,14 @@ another dict, a callable or an instance with public fields:
     class Model:
         owner = "arthexis"
                                          # Valid tokens
-    context = {
-        "USERNAME": "arthexis",          # [USERNAME]
-        "SETTINGS": {"NAME": "webapp"},  # [SETTINGS.NAME]
-        "MODEL": Model,                  # [MODEL.OWNER]
-        "UPPER": lambda x: x.upper(),    # [UPPER='text']
-        "RNG": lambda _: randint(),      # [RNG]
-    }
+    with context(
+        MODEL: Model,                  # [MODEL.OWNER]
+        UPPER: lambda x: x.upper(),    # [UPPER='text']
+    ):
+        assert resolve("[MODEL.OWNER.UPPER]") == "ARTHEXIS"
 
-Instead of passing the context explicitly,
-a global default context can be set
-to be used by all calls to *resolve*,
-you can see an example in the Django integration below.
-
+When a callable is included in the context it can be used
+as a post-processing filter after other expressions.
 
 
 Django Integration

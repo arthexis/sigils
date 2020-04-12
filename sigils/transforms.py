@@ -1,30 +1,52 @@
+import os
 import logging
 import threading
 import contextlib
 import collections
-import configparser
 from typing import (
     Mapping, Union, Tuple, Text, Iterator, Callable, Any, Optional
 )
+
+# noinspection PyUnresolvedReferences
+from lru import LRU
 
 from . import parsing, filters, exceptions
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["context", "replace", "resolve"]
+__all__ = [
+    "context",
+    "replace",
+    "resolve",
+    "RAISE",
+    "DEFAULT",
+    "CONTINUE",
+    "REMOVE"
+]
 
 
-# Global default context
-# Don't modify this directly, use context()
-_default_context = {
-    "JOIN": filters.join,
-}
+class System:
+    """Used for the SYS default context."""
+
+    class _Env:
+        def __getitem__(self, item):
+            return os.getenv(item)
+
+    _env = _Env()
+
+    @property
+    def env(self):
+        return self._env
 
 
 # Thread local context
 class ThreadLocal(threading.local):
     def __init__(self):
-        self.ctx: Mapping = collections.ChainMap(_default_context)
+        self.ctx: Mapping = collections.ChainMap({
+            "JOIN": filters.join,
+            "SYS": System()
+        })
+        self.lru = LRU(128)
 
 
 _local = ThreadLocal()
@@ -46,29 +68,45 @@ def context(*args, **kwargs) -> None:
 
     _local.ctx = _local.ctx.new_child(kwargs)
     for arg in args:
-        for section, config in arg.items():
-            _local.ctx[section] = config
+        for key, val in arg.items():
+            _local.ctx[key] = val
     yield _local.ctx
     _local.ctx = _local.ctx.parents
+    _local.lru.clear()
+
+
+# Resolve on_error constants
+CONTINUE = "continue"
+RAISE = "raise"
+REMOVE = "remove"
+DEFAULT = "default"
 
 
 # noinspection PyBroadException,PyDefaultArgument
 def resolve(
     text: str,
     serializer: Callable[[Any], str] = str,
-    raise_errors: bool = False,
+    on_error: str = DEFAULT,
     default: Optional[str] = "",
+    recursion_limit: int = 20,
+    cache: bool = True,
 ) -> str:
     """
     Resolve all sigils found in text, using the local context.
-
-    If the sigil can't be resolved, return it unchanged unless
-    required is True, in which case raise SigilError.
+    If the text contains no sigils, it will be returned unchanged.
 
     :param text: The text containing sigils.
-    :param raise_errors: If True, raise SigilError if a sigil can't be resolved.
+    :param on_error: What to do if a sigil cannot be resolved:
+        DEFAULT: Replace the sigil with the default value (the default).
+        CONTINUE: Ignore the error and leave the text unchanged.
+        RAISE: Raise a SigilError detailing the problem.
+        REMOVE: Remove the sigil from the text output.
     :param serializer: Function used to serialize the sigil value, defaults to str.
-    :param default: Value to use when returned value is None, defaults to "".
+    :param default: Value to use when the sigils resolves to None, defaults to "".
+    :param recursion_limit: If greater than zero, and the output of a resolved sigil
+        contains other sigils, resolve them as well until no sigils remain or
+        until the recursion limit is reached (default 20).
+    :param cache: Use an LRU cache to store resolved sigils (default True).
 
     >>> # Resolving sigils using context:
     >>> with context(ENV={"HOST": "localhost"}, USER="arthexis"}):
@@ -88,17 +126,36 @@ def resolve(
         try:
             # By using a lark transformer, we parse and resolve
             # each sigil in isolation and in a single pass
-            tree = parsing.parse(sigil)
-            transformer = parsing.ContextTransformer(_local.ctx)
-            value = transformer.transform(tree).children[0]
-            logger.debug(f"Sigil {sigil} resolved to '{value}'.")
+            if cache and sigil in _local.lru:
+                value = _local.lru[sigil]
+                logger.debug(f"Sigil {sigil} value from cache '{value}'.")
+            else:
+                tree = parsing.parse(sigil)
+                transformer = parsing.ContextTransformer(_local.ctx)
+                value = transformer.transform(tree).children[0]
+                logger.debug(f"Sigil {sigil} resolved to '{value}'.")
+                if cache:
+                    _local.lru[sigil] = value
             if value is None:
                 text = text.replace(sigil, default)
             else:
-                text = text.replace(sigil, serializer(value))
+                fragment = serializer(value)
+                if recursion_limit > 0:
+                    fragment = resolve(
+                        fragment,
+                        serializer,
+                        on_error,
+                        default,
+                        recursion_limit=(recursion_limit - 1)
+                    )
+                text = text.replace(sigil, fragment)
         except Exception as ex:
-            if raise_errors:
+            if on_error == RAISE:
                 raise exceptions.SigilError(sigil) from ex
+            elif on_error == REMOVE:
+                text = text.replace(sigil, "")
+            elif on_error == DEFAULT:
+                text = text.replace(sigil, default)
             logger.debug(f"Sigil {sigil} not resolved.")
 
     if results:

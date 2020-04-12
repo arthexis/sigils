@@ -48,26 +48,26 @@ def test_model_has_objects_attribute():
 def test_model_context_class():
     UserModel(pk=1, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
-        assert resolve("[USR]", serializer=lambda x: x.__name__, raise_errors=True) == "UserModel"
+        assert resolve("[USR]", serializer=lambda x: x.__name__) == "UserModel"
 
 
 def test_model_context_pk_attribute():
     UserModel(pk=1, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
-        assert resolve("[USR=1.NAME]", raise_errors=True) == "arthexis"
+        assert resolve("[USR=1.NAME]") == "arthexis"
 
 
 def test_model_context_pk():
     UserModel(pk=2, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
-        assert resolve("[USR.NAME='arthexis'.PK]", raise_errors=True) == "1"
+        assert resolve("[USR.NAME='arthexis'.PK]") == "1"
 
 
 def test_model_context_wrong_attribute():
     UserModel(pk=3, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
         with pytest.raises(SigilError):
-            assert resolve("[USR='admin'.NAME]", raise_errors=True)
+            assert resolve("[USR='admin'.NAME]", on_error=RAISE)
 
 
 def test_model_context_get_by_natural_key():

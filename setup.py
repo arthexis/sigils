@@ -31,6 +31,7 @@ setup(
     ],
     install_requires=[
         'lark-parser',
+        'lru-dict'
     ],
     extras_require={
         'django': [
