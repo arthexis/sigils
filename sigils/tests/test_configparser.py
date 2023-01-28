@@ -4,6 +4,7 @@ import pathlib
 import pytest
 
 from ..transforms import *  # Module under test
+from ..contexts import context
 
 
 TEST_DIR = pathlib.Path(__file__).parent.absolute()

@@ -1,3 +1,5 @@
+import os
+
 from ..parsing import *  # Module under test
 
 
@@ -14,5 +16,7 @@ def test_ignore_whitespace():
 
 
 def test_extract_file_stream():
-    with open("tests/data/sample.txt", "r") as fp:
+    # Chdir to test data directory
+    os.chdir(os.path.dirname(__file__))
+    with open("data/sample.txt", "r") as fp:
         assert set(extract(fp)) == {"[ENV.HOST]"}

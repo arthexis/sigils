@@ -1,7 +1,9 @@
 import pytest
 
 from ..transforms import *  # Module under test
-from ..exceptions import SigilError
+from ..errors import SigilError
+from ..sigils import Sigil
+from ..contexts import context
 
 
 def test_sigil_with_simple_context():
@@ -40,7 +42,7 @@ def test_replace_missing_sigils_with_default():
 
 def test_remove_missing_sigils():
     with context(USER="arthexis"):
-        assert not resolve("[NOT_USER]", on_error=REMOVE)
+        assert not resolve("[NOT_USER]", on_error=OnError.REMOVE)
 
 
 def test_attributes_casefold():
@@ -76,7 +78,7 @@ def test_call_lambda_reverse():
 def test_call_lambda_error():
     with context(DIVIDE_BY_ZERO=lambda arg: arg / 0):
         with pytest.raises(SigilError):
-            resolve("[DIVIDE_BY_ZERO=1]", on_error=RAISE)
+            resolve("[DIVIDE_BY_ZERO=1]", on_error=OnError.RAISE)
 
 
 def test_item_subscript():
@@ -87,13 +89,13 @@ def test_item_subscript():
 def test_item_subscript_key_not_found():
     with context(A={"B": "C"}):
         with pytest.raises(SigilError):
-            resolve("[A.C]", on_error=RAISE)
+            resolve("[A.C]", on_error=OnError.RAISE)
 
 
 def test_required_key_not_in_context():
     with context(USER="arthexis"):
         with pytest.raises(SigilError):
-            resolve("[ENV]", on_error=RAISE)
+            resolve("[ENV]", on_error=OnError.RAISE)
 
 
 def test_replace_duplicated():

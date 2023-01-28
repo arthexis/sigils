@@ -95,11 +95,13 @@ class ContextTransformer(lark.Transformer):
     def _ctx_lookup(self, key):
         logger.debug(f"Context lookup: {key}")
         try:
+            # if isinstance(key, str):
+            #    key = key.lower()
             value = self.ctx[key]
-            logger.debug(f"Found: {value}")
+            logger.debug(f"Found {type(value)}.")
             return value
         except KeyError as ex:
-            logger.debug(f"Not in context.")
+            logger.debug(f"{key} not found.")
             raise ex
 
     @lark.v_args(inline=True)

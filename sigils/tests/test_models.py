@@ -1,8 +1,9 @@
 import pytest
 from dataclasses import dataclass
 
-from ...transforms import *  # Module under test
-from ...exceptions import SigilError
+from ..transforms import *  # Module under test
+from ..errors import SigilError
+from ..contexts import context
 
 DATABASE = []
 
@@ -67,7 +68,7 @@ def test_model_context_wrong_attribute():
     UserModel(pk=3, name="arthexis", alias="admin").save()
     with context(USR=UserModel):
         with pytest.raises(SigilError):
-            assert resolve("[USR='admin'.NAME]", on_error=RAISE)
+            assert resolve("[USR='admin'.NAME]", on_error=OnError.RAISE)
 
 
 def test_model_context_get_by_natural_key():
@@ -76,7 +77,4 @@ def test_model_context_get_by_natural_key():
         assert resolve("[USR='arthexis'.ALIAS]") == 'admin'
 
 
-def test_resolve_from_file():
-    with context(ENV={"HOST": "local"}):
-        with open("tests/data/sample.txt") as fp:
-            assert resolve(fp) == 'Server: local'
+

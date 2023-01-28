@@ -1,5 +1,6 @@
 
 from ..transforms import *  # Module under test
+from ..contexts import context
 
 
 def test_join_list():
