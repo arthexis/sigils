@@ -117,8 +117,8 @@ def replace(
     """
 
     sigils = list(parsing.extract(text))
-    n = hasattr(pattern, "__next__")
     for sigil in set(sigils):
-        text = text.replace(sigil, str(next(pattern)) if n else pattern)
+        text = (text.replace(sigil, str(next(pattern)) 
+                if hasattr(pattern, "__next__") else pattern))
     return text, tuple(sigils)
 

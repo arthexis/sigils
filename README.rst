@@ -129,22 +129,6 @@ The following characters are reserved and cannot be used in sigils:
 * ``\``: escape character
 
 
-Protected Sigils
-----------------
-
-By starting a sigil with a ``.`` character, you can protect it from being
-printed to logs unless the ``SIGILS_LOG_PROTECTED`` environment variable
-is set to ``1``. This is useful for sensitive data such as passwords.
-
-.. code-block:: text
-
-    [.MODEL='natural-key'.PASSWORD]
-    [.USER=[USERNAME].SECRET]
-
-
-Instead of the sigil, its value will be replaced with ``[...]`` in the logs.
-
-
 Resolve and Replace
 -------------------
 
@@ -203,8 +187,7 @@ with the result and a list of sigils that were not resolved:
 
 The *replace* function doesn't resolve a sigil, instead it replaces it
 with another pattern of text and extracts all sigils that were replaced.
-This is useful for logging. For example, you can replace a sigil with
-a placeholder and then log the sigil separately:
+This may also be useful for debugging and logging. For example:
 
 .. code-block:: python
 
@@ -265,21 +248,38 @@ Then you can use something like this in your template:
 .. _simple tag: https://docs.djangoproject.com/en/2.2/howto/custom-template-tags/#simple-tags
 
 
-Dependencies
-------------
-
-* lark_: Allows us to parse complex sigils faster.
-* lru-dict_: A fast LRU cache implementation.
-
-
-Roadmap
--------
-
-- [ ] Improved built-in support for Django models.
-- [ ] Access to environment variables within SYS context.
-
-
-
+Project Dependencies
+--------------------
 
 .. _lark: https://github.com/lark-parser/lark
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
+
+
+Features Roadmap
+----------------
+
+- [ ] Improved built-in support for Django models.
+- [ ] Improved access to environment variables within SYS context.
+- [ ] Support for custom context functions (probably via a decorator)
+- [ ] Support for list indexing and slicing.
+- [ ] Ability to monkey-patch sigil functionality into existing classes.
+- [ ] Ability to load context from a JSON, YAML, or TOML file.
+- [ ] Additional SYS operations: OR, AND, NOT, IN, XPATH, REGEX, etc.
+- [ ] Keep track of accessed context keys to optimize performance.
+- [ ] More magic.
+
+
+Protected Sigils (In Development)
+----------------
+
+By starting a sigil with a ``.`` character, you can protect it from being
+printed to logs unless the ``SIGILS_LOG_PROTECTED`` environment variable
+is set to ``1``. This is useful for sensitive data such as passwords.
+
+.. code-block:: text
+
+    [.MODEL='natural-key'.PASSWORD]
+    [.USER=[USERNAME].SECRET]
+
+
+Instead of the sigil, its value will be replaced with ``[...]`` in the logs.

@@ -7,12 +7,11 @@ with open(path.join(base_dir, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='sigils',
-    version='0.1.0',
+    version='0.1.1',
     description='Extract, resolve, replace and connect [SIGILS] embedded in text.',
     long_description=long_description,
-    long_description_content_type='text/x-rst',
     url='http://github.com/arthexis/sigils',
-    download_url='https://github.com/arthexis/sigils/archive/v0.1.0.tar.gz',
+    download_url='https://github.com/arthexis/sigils/archive/v0.1.1.tar.gz',
     author='Rafael Jesus Guillén Osorio',
     author_email='arthexis@gmail.com',
     license='MIT',
@@ -27,17 +26,16 @@ setup(
         'Topic :: Utilities',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
     ],
     install_requires=[
         'lark-parser',
         'lru-dict'
     ],
-    extras_require={
-        'django': [
-            'django',
-        ],
+    extras_require={  # Optional
         'dev': [
+            'django',
             'pytest',
             'black',
             'pytest-cov',
