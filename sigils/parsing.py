@@ -55,17 +55,17 @@ def extract(
 
     buffer = []
     depth = 0
-    if isinstance(text, str):
-        text = io.StringIO(text)
+    if isinstance(text, str): text = io.StringIO(text)
     while char := text.read(1):
-        if char == left:
-            depth += 1
+        if char == left: depth += 1
         if depth > 0:
             buffer.append(char)
             if char == right:
                 depth -= 1
                 if depth == 0:
-                    yield ''.join(buffer)
+                    token = ''.join(buffer)
+                    if token.count("'") % 2 == 0 and token.count('"') % 2 == 0:
+                        yield token
                     buffer.clear()
 
 
@@ -79,7 +79,9 @@ def _try_get_item(obj, key):
 def _try_call(func, arg, *args):
     if callable(func):
         logger.debug(f"Callable, try with {arg=} {args=}.")
-        return func(arg, *args) if arg else func(*args)
+        if arg is not None: return func(arg, *args)
+        if args: return func(*args)
+        return func()
 
 
 def _try_manager(model):
@@ -156,6 +158,8 @@ class ContextTransformer(lark.Transformer):
                 target = _try_call(field, param) or field
             elif _filter := self._ctx_lookup(name):
                 logger.debug(f"Filter {name} found in context.")
+                # Filters are called with the current target as the first arg
+                # This will fail if the function does not accept parameters
                 target = _try_call(_filter, target, param)
             else:
                 logger.debug("Unable to consume complete sigil.")

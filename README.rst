@@ -258,19 +258,22 @@ Project Dependencies
 Features Roadmap
 ----------------
 
+- [ ] Update packaging to use pyproject.toml. 
 - [ ] Improved built-in support for Django models.
 - [ ] Improved access to environment variables within SYS context.
-- [ ] Support for custom context functions (probably via a decorator)
+- [ ] Support for custom context functions (probably via a decorator).
 - [ ] Support for list indexing and slicing.
 - [ ] Ability to monkey-patch sigil functionality into existing classes.
 - [ ] Ability to load context from a JSON, YAML, or TOML file.
 - [ ] Additional SYS operations: OR, AND, NOT, IN, XPATH, REGEX, etc.
 - [ ] Keep track of accessed context keys to optimize performance.
+- [ ] API to resolve sigils remotely, cache results, browse context, etc.
+- [ ] Benchmarking and performance improvements.
 - [ ] More magic.
 
 
 Protected Sigils (In Development)
-----------------
+---------------------------------
 
 By starting a sigil with a ``.`` character, you can protect it from being
 printed to logs unless the ``SIGILS_LOG_PROTECTED`` environment variable

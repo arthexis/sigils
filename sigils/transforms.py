@@ -1,10 +1,9 @@
-
-import logging
 from enum import Enum
 from typing import Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
 
 from . import errors, parsing, contexts
 
+import logging
 logger = logging.getLogger(__name__)
 
 

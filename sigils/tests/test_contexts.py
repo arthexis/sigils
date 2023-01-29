@@ -46,7 +46,6 @@ def test_remove_missing_sigils():
 
 
 def test_attributes_casefold():
-
     class Env:
         def __init__(self, host):
             self.ssh_hostname = host
@@ -144,3 +143,20 @@ def test_resolve_recursive_one_level():
 def test_sigil_helper_class():
     sigil = Sigil("Hello [PLACE]")
     assert sigil(PLACE="World") == "Hello World"
+
+
+# Test converstion to json works with the standard library
+# using the Sigil class
+def test_json_conversion():
+    import json
+    with context(USER="arthexis"):
+        sigil = Sigil("Hello [USER]")
+        assert json.dumps(sigil) == '"Hello [USER]"'
+
+
+# RJGO New functionatlity: using lists in the context
+# Disable temporarily
+@pytest.mark.skip
+def test_item_subscript():
+    with context(A=[1,2,3]):
+        assert resolve("[A.2]") == 3

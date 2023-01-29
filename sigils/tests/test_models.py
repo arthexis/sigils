@@ -77,4 +77,10 @@ def test_model_context_get_by_natural_key():
         assert resolve("[USR='arthexis'.ALIAS]") == 'admin'
 
 
+# Test serializing a model using json from the standard library
+def test_model_json_serialization():
+    import json
+    UserModel(pk=3, name="arthexis", alias="admin").save()
+    with context(USR=UserModel):
+        assert json.loads(resolve("[USR='arthexis'.ALIAS]", serializer=json.dumps)) == 'admin'
 

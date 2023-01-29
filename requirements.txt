@@ -3,3 +3,4 @@ lru-dict
 django
 pytest
 twine
+python-dotenv

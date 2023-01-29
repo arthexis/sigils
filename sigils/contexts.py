@@ -49,6 +49,22 @@ class ThreadLocal(threading.local):
             "FOLD": lambda x: str(x).casefold(),
             "LOWER": lambda x: str(x).lower(),
             "UPPER": lambda x: str(x).upper(),
+            "TRIM": lambda x: str(x).strip(),
+            "STRIP": lambda x: str(x).strip(),
+            "OR": lambda x, y: x or y,
+            "AND": lambda x, y: x and y,
+            "NOT": lambda x: not x,
+            "BOOL": lambda x: bool(x),
+            "INT": lambda x: int(x),
+            "FLOAT": lambda x: float(x),
+            "STR": lambda x: str(x),
+            "LEN": lambda x: len(x),
+            "LIST": lambda x: list(x),
+            "TUPLE": lambda x: tuple(x),
+            "SET": lambda x: set(x),
+            "DICT": lambda x: dict(x),
+            "REVERSE": lambda x: x[::-1],
+            "SORT": lambda x: sorted(x),
         })
         self.lru = LRU(128)
 
