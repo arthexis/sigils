@@ -14,6 +14,10 @@ GRAMMAR = r"""
              | "'" /[^']+/ "'"
              | "\"" /[^"]+/ "\""
              | integer
+             | CNAME
+             | "True"
+             | "False"
+             | "None"
              | null
     null     : "NULL"
     integer  : INT
@@ -76,12 +80,15 @@ def _try_get_item(obj, key):
         return None
 
 
-def _try_call(func, arg, *args):
+def _try_call(func, *args) -> Union[None, str]:
     if callable(func):
-        logger.debug(f"Callable, try with {arg=} {args=}.")
-        if arg is not None: return func(arg, *args)
+        logger.debug(f"Callable, try with {args=}.")
+        args = tuple(arg for arg in args if arg is not None)
         if args: return func(*args)
-        return func()
+        else: return func()
+    else:
+        logger.debug(f"Non-callable {func}.")
+        return None
 
 
 def _try_manager(model):
@@ -97,10 +104,8 @@ class ContextTransformer(lark.Transformer):
     def _ctx_lookup(self, key):
         logger.debug(f"Context lookup: {key}")
         try:
-            # if isinstance(key, str):
-            #    key = key.lower()
             value = self.ctx[key]
-            logger.debug(f"Found {type(value)}.")
+            logger.debug(f"Found {type(value)} {value}")
             return value
         except KeyError as ex:
             logger.debug(f"{key} not found.")
@@ -108,15 +113,17 @@ class ContextTransformer(lark.Transformer):
 
     @lark.v_args(inline=True)
     def sigil(self, *nodes):
-        stack: list = list(nodes[::-1])
+        stack = list(nodes[::-1])
         logger.debug(f"Resolving node stack {stack}.")
-        # Process the first node
+        # Process the first node (root)
         name, param = stack.pop()
+        if isinstance(param, lark.Token): param = param.value
         if not (target := self._ctx_lookup(name)):
             logger.debug(f"Root '{name}' not found in context.")
             return
         if manager := _try_manager(target):
-            logger.debug("Found 'objects' attribute, treat as Model.")
+            # We don't want to find managers after the first node
+            logger.debug("Found 'objects' attribute, treat as Django Model.")
             if param:
                 logger.debug(f"Search by pk={param}")
                 if instance := manager.get(pk=param):
@@ -138,6 +145,7 @@ class ContextTransformer(lark.Transformer):
                 except RuntimeError as ex:
                     stack.append((name, param))
         elif callable(target):
+            logger.debug("Root is callable, try to call.")
             target = _try_call(target, param)
         elif param:
             if isinstance(param, int):
@@ -145,9 +153,15 @@ class ContextTransformer(lark.Transformer):
             if value := _try_get_item(target, param):
                 logger.debug(f"Lookup param '{param}' found.")
                 target = value
-        # Process additional nodes after the first
+        else:
+            logger.debug(f"No param, no lookup. Root: {name=}.")
+        # Process additional nodes after the first (root)
+        logger.debug(f"Target: {target} {stack=}.")
         while stack:
+            # TODO: Use a match statement?
             name, param = stack.pop()
+            if isinstance(param, lark.Token): param = param.value
+            logger.debug(f"Consume {name=} {param=}.")
             if field := _try_get_item(target, name):
                 # This finds items only (not attributes)
                 logger.debug(f"Field (exact) {name} found in {target}.")
@@ -163,7 +177,7 @@ class ContextTransformer(lark.Transformer):
                 target = _try_call(_filter, target, param)
             else:
                 logger.debug("Unable to consume complete sigil.")
-                return
+                assert False, f"Unable to resolve {name} in {target}."
         return target
 
     # Flatten nodes (otherwise a Tree is returned)

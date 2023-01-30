@@ -258,7 +258,8 @@ Project Dependencies
 Features Roadmap
 ----------------
 
-- [ ] Update packaging to use pyproject.toml. 
+- [x] Update packaging to use pyproject.toml. 
+- [ ] Add 'sigil' project script to pyproject.toml.
 - [ ] Improved built-in support for Django models.
 - [ ] Improved access to environment variables within SYS context.
 - [ ] Support for custom context functions (probably via a decorator).

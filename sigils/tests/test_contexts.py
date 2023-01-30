@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from ..transforms import *  # Module under test
@@ -155,8 +156,19 @@ def test_json_conversion():
 
 
 # RJGO New functionatlity: using lists in the context
-# Disable temporarily
-@pytest.mark.skip
 def test_item_subscript():
     with context(A=[1,2,3]):
-        assert resolve("[A.2]") == 3
+        assert resolve("[A.ITEM=2]") == "3"
+
+
+# Test getting the host from the environment
+def test_get_login_from_env():
+    import os
+    assert resolve("[SYS.OS_LOGIN]") == os.getlogin()
+
+
+# Check that SYS.ENV is a dictionary with PATH
+def test_get_env():
+    import os
+    assert resolve("[SYS.ENV.PATH]") == os.environ["PATH"]
+

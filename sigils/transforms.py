@@ -29,10 +29,10 @@ def resolve(
 
     :param text: The text containing sigils.
     :param on_error: What to do if a sigil cannot be resolved:
-        DEFAULT: Replace the sigil with the default value (the default).
-        CONTINUE: Ignore the error and leave the text unchanged.
-        RAISE: Raise a SigilError detailing the problem.
-        REMOVE: Remove the sigil from the text output.
+        OnError.DEFAULT: Replace the sigil with the default value (the default).
+        OnError.CONTINUE: Ignore the error and leave the text unchanged.
+        OnError.RAISE: Raise a SigilError detailing the problem.
+        OnError.REMOVE: Remove the sigil from the text output.
     :param serializer: Function used to serialize the sigil value, defaults to str.
     :param default: Value to use when the sigils resolves to None, defaults to "".
     :param recursion_limit: If greater than zero, and the output of a resolved sigil
@@ -51,7 +51,7 @@ def resolve(
     sigils = set(parsing.extract(text))
 
     if not sigils:
-        logger.debug(f"No sigils in '{text}'.")
+        logger.debug(f"No more sigils in '{text}'.")
         return text  # Not an error, just do nothing
 
     results = []

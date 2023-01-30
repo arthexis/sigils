@@ -6,6 +6,9 @@ import threading
 
 from lru import LRU
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Try to import django.utils.timezone as datetime if exists
 # If it doesn't, just normal datetime
 try:
@@ -24,20 +27,28 @@ class System:
     _env = _Env()
 
     @property
-    def env(self):
-        return System._env
+    def env(self): return System._env
     
     @property
-    def now(self):
-        return datetime.now()
+    def now(self): return datetime.now()
 
     @property
-    def today(self):
-        return datetime.today()
+    def today(self): return datetime.today()
 
     @property
-    def uuid(self):
-        return str(uuid.uuid4()).replace('-', '')
+    def uuid(self): return str(uuid.uuid4()).replace('-', '')
+
+    @property
+    def pid(self): return os.getpid()
+
+    @property
+    def cwd(self): return os.getcwd()
+
+    @property
+    def os_login(self): return os.getlogin()
+
+    @property
+    def os_name(self): return os.name
 
 
 class ThreadLocal(threading.local):
@@ -46,9 +57,6 @@ class ThreadLocal(threading.local):
             "SYS": System(),
             "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
             "REAL": lambda x: float(x) if "." in x else int(x),
-            "FOLD": lambda x: str(x).casefold(),
-            "LOWER": lambda x: str(x).lower(),
-            "UPPER": lambda x: str(x).upper(),
             "TRIM": lambda x: str(x).strip(),
             "STRIP": lambda x: str(x).strip(),
             "OR": lambda x, y: x or y,
@@ -65,15 +73,47 @@ class ThreadLocal(threading.local):
             "DICT": lambda x: dict(x),
             "REVERSE": lambda x: x[::-1],
             "SORT": lambda x: sorted(x),
+            "ITEM": lambda x, y: x[y],
+            "INDEX": lambda x, y: x.index(y),
+            "KEY": lambda x, y: x.get(y),
+            "ISO": lambda x: x.isoformat(),
+            "ANY": lambda x: any(x),
+            "ALL": lambda x: all(x),
+            "SUM": lambda x: sum(x),
+            "MIN": lambda x: min(x),
+            "MAX": lambda x: max(x),
+            "FIRST": lambda x: x[0],
+            "LAST": lambda x: x[-1],
+            "COUNT": lambda x: x.count(),
+            "ADD": lambda x, y: x + y,
+            "SUB": lambda x, y: x - y,
+            "MUL": lambda x, y: x * y,
+            "DIV": lambda x, y: x / y,
+            "MOD": lambda x, y: x % y,
+            "EQ": lambda x, y: x == y,
+            "NEQ": lambda x, y: x != y,
+            "LT": lambda x, y: x < y,
+            "LTE": lambda x, y: x <= y,
+            "GT": lambda x, y: x > y,
+            "GTE": lambda x, y: x >= y,
+            "IN": lambda x, y: x in y,
+            "HAS": lambda x, y: y in x,
+            "CONTAINS": lambda x, y: y in x,
+            "STARTS": lambda x, y: x.startswith(y),	
+            "ENDS": lambda x, y: x.endswith(y),
+            "TYPE": lambda x: type(x).__name__,
+            "IS": lambda x, y: isinstance(x, y),
+            "FLAT": lambda x: [i for j in x for i in j],
         })
         self.lru = LRU(128)
+        # Add default context sources and thread local variables here
 
 
 _local = ThreadLocal()
 
 
 @contextlib.contextmanager
-def context(*args, **kwargs) -> None:
+def context(*args, **kwargs) -> collections.ChainMap:
     """Update the local context used for resolving sigils temporarily.
 
     :param args: A tuple of context sources.
@@ -89,6 +129,7 @@ def context(*args, **kwargs) -> None:
     for arg in args:
         for key, val in arg.items():
             _local.ctx[key] = val
+    logger.debug("Context: %s", _local.ctx)
     yield _local.ctx
     _local.ctx = _local.ctx.parents
     _local.lru.clear()

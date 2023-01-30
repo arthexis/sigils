@@ -35,16 +35,6 @@ def test_chained_functions():
         assert resolve("[CUSTOM.UPPER]") == "HELLO WORLD"
 
 
-# Test a custom filter that does nothing
-def test_noop_filter():
-    def custom_func(self):
-        return self
-    
-    with context(NOOP=custom_func, HELLO="Hello World"):
-        assert resolve("[HELLO.NOOP]") == "Hello World"
-
-
-
 # Test a custom two parameter function
 def test_two_parameter_function():
     def func_add_to_self(self, other):
@@ -54,10 +44,21 @@ def test_two_parameter_function():
         assert resolve("[HELLO.APPEND='World']") == "Hello World"
 
 
-# Test a custom function with a default parameter
-def test_default_parameter_function():
-    def func_add_to_self(self, other="World"):
-        return self + other
-
-    with context(NOOP=func_add_to_self, HELLO="Hello "):
+# Test a custom filter that does nothing
+# TODO: Fix this test
+def test_noop_filter():
+    def custom_func(self):
+        return self
+    
+    with context(NOOP=custom_func, HELLO="Hello World"):
         assert resolve("[HELLO.NOOP]") == "Hello World"
+
+
+# Test a custom function with a default parameter
+# TODO: Fix this test
+def test_default_parameter_function():
+    def concat_func(self, other="World"):
+        return f"{self}{other}"
+
+    with context(CONCAT=concat_func, HELLO="Hello "):
+        assert resolve("[HELLO.CONCAT]") == "Hello World"

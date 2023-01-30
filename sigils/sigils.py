@@ -18,7 +18,7 @@ class Sigil(str):
     
     def __repr__(self):
         """Return a representation of the sigil."""
-        return f"<Sigil '{self.original}'>"
+        return self.original
 
     def __call__(self, *args, **kwargs):
         """Send all args and kwargs to context, then resolve."""
