@@ -1,4 +1,3 @@
-import os
 import pytest
 
 from ..transforms import *  # Module under test
@@ -23,7 +22,6 @@ def test_callable_no_param():
 
 
 def test_class_static_attribute():
-
     class Entity:
         code = "Hello"
 

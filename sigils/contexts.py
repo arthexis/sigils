@@ -104,6 +104,10 @@ class ThreadLocal(threading.local):
             "TYPE": lambda x: type(x).__name__,
             "IS": lambda x, y: isinstance(x, y),
             "FLAT": lambda x: [i for j in x for i in j],
+            "PREFIX": lambda x, y: f"{y}{x}",
+            "SUFFIX": lambda x, y: f"{x}{y}",
+            "SPLIT": lambda x, y: x.split(y),
+            "RSPLIT": lambda x, y: x.rsplit(y),
         })
         self.lru = LRU(128)
         # Add default context sources and thread local variables here

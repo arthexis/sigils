@@ -2,8 +2,6 @@
 
 import sys
 from .sigils import Sigil, context
-from .parsing import _try_call
-
 
 import logging
 
