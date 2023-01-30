@@ -176,8 +176,7 @@ class ContextTransformer(lark.Transformer):
                 # This will fail if the function does not accept parameters
                 target = _try_call(_filter, target, param)
             else:
-                logger.debug("Unable to consume complete sigil.")
-                assert False, f"Unable to resolve {name} in {target}."
+                logger.debug("Unable to consume complete sigil at {name} in {target}.") 
         return target
 
     # Flatten nodes (otherwise a Tree is returned)

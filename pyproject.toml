@@ -35,5 +35,8 @@ dependencies = [
 django = ["Django>=3.2"]
 dev = ["pytest", "pytest-cov", "python-dotenv"]
 
+[project.scripts]
+sigils = "sigils.cli:main"
+
 
 

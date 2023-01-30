@@ -70,9 +70,7 @@ def resolve(
                 logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
                 if cache:
                     contexts._local.lru[sigil] = value
-            if value is None:
-                text = text.replace(sigil, default)
-            else:
+            if value is not None:
                 fragment = serializer(value)
                 if recursion_limit > 0:
                     fragment = resolve(
@@ -82,7 +80,7 @@ def resolve(
                         default,
                         recursion_limit=(recursion_limit - 1)
                     )
-                text = text.replace(sigil, fragment)
+            text = text.replace(sigil, fragment)
         except Exception as ex:
             if on_error == OnError.RAISE:
                 raise errors.SigilError(sigil) from ex
@@ -90,7 +88,7 @@ def resolve(
                 text = text.replace(sigil, "")
             elif on_error == OnError.DEFAULT:
                 text = text.replace(sigil, default)
-            logger.debug("Sigil '%s' not resolved.", sigil)
+            logger.debug(f"Sigil '{sigil}' could not be resolved:\n{ex}")
 
     if results:
         return results if len(results) > 1 else results[0]

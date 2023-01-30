@@ -1,3 +1,5 @@
+import os
+import datetime
 import pytest
 
 from ..transforms import *  # Module under test
@@ -161,12 +163,19 @@ def test_item_subscript():
 
 # Test getting the host from the environment
 def test_get_login_from_env():
-    import os
     assert resolve("[SYS.OS_LOGIN]") == os.getlogin()
 
 
 # Check that SYS.ENV is a dictionary with PATH
 def test_get_env():
-    import os
     assert resolve("[SYS.ENV.PATH]") == os.environ["PATH"]
 
+
+# Test SYS.NOW produces correct year
+def test_get_now():
+    assert resolve("[SYS.NOW.YEAR]") == str(datetime.datetime.now().year)
+
+
+# Test SYS.PID produces correct pid
+def test_get_pid():
+    assert resolve("[SYS.PID]") == str(os.getpid())

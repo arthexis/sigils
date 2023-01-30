@@ -62,3 +62,9 @@ def test_default_parameter_function():
 
     with context(CONCAT=concat_func, HELLO="Hello "):
         assert resolve("[HELLO.CONCAT]") == "Hello World"
+
+
+# Test splitting a string
+def test_split_string():
+    with context(HELLO="Hello World"):
+        assert resolve("[HELLO.RSPLIT=' ']") == "Hello"

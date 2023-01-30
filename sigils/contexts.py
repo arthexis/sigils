@@ -9,9 +9,10 @@ from lru import LRU
 import logging
 logger = logging.getLogger(__name__)
 
-# Try to import django.utils.timezone as datetime if exists
-# If it doesn't, just normal datetime
 try:
+    if not os.environ.get("DJANGO_SETTINGS_MODULE"):
+        logger.debug("No DJANGO_SETTINGS_MODULE set, using datetime.datetime")
+        raise ImportError
     from django.utils import timezone as datetime
 except ImportError:
     from datetime import datetime
@@ -57,6 +58,7 @@ class ThreadLocal(threading.local):
             "SYS": System(),
             "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
             "REAL": lambda x: float(x) if "." in x else int(x),
+            "NUMBER": lambda x: float(x) if "." in x else int(x),
             "TRIM": lambda x: str(x).strip(),
             "STRIP": lambda x: str(x).strip(),
             "OR": lambda x, y: x or y,
@@ -67,8 +69,8 @@ class ThreadLocal(threading.local):
             "FLOAT": lambda x: float(x),
             "STR": lambda x: str(x),
             "LEN": lambda x: len(x),
-            "LIST": lambda x: list(x),
             "TUPLE": lambda x: tuple(x),
+            "LIST": lambda x: list(x),
             "SET": lambda x: set(x),
             "DICT": lambda x: dict(x),
             "REVERSE": lambda x: x[::-1],
@@ -97,7 +99,6 @@ class ThreadLocal(threading.local):
             "GT": lambda x, y: x > y,
             "GTE": lambda x, y: x >= y,
             "IN": lambda x, y: x in y,
-            "HAS": lambda x, y: y in x,
             "CONTAINS": lambda x, y: y in x,
             "STARTS": lambda x, y: x.startswith(y),	
             "ENDS": lambda x, y: x.endswith(y),
@@ -106,8 +107,9 @@ class ThreadLocal(threading.local):
             "FLAT": lambda x: [i for j in x for i in j],
             "PREFIX": lambda x, y: f"{y}{x}",
             "SUFFIX": lambda x, y: f"{x}{y}",
-            "SPLIT": lambda x, y: x.split(y),
-            "RSPLIT": lambda x, y: x.rsplit(y),
+            "LSPLIT": lambda x, y: str(x).split(y, 1)[0],
+            "RSPLIT": lambda x, y: str(x).rsplit(y, 1)[1],
+            "SPLIT": lambda x, y: str(x).split(y),
         })
         self.lru = LRU(128)
         # Add default context sources and thread local variables here
