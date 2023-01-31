@@ -259,14 +259,14 @@ Features Roadmap
 ----------------
 
 - [x] Update packaging to use pyproject.toml. 
-- [ ] Add 'sigil' project script to pyproject.toml.
+- [X] Add 'sigil' project script to pyproject.toml.
 - [ ] Improved built-in support for Django models.
-- [ ] Improved access to environment variables within SYS context.
-- [ ] Support for custom context functions (probably via a decorator).
+- [X] Improved access to environment variables within SYS context.
+- [ ] Support for custom gobal-level context functions (probably via a decorator).
 - [ ] Support for list indexing and slicing.
 - [ ] Ability to monkey-patch sigil functionality into existing classes.
 - [ ] Ability to load context from a JSON, YAML, or TOML file.
-- [ ] Additional SYS operations: OR, AND, NOT, IN, XPATH, REGEX, etc.
+- [ ] Consider additional OOTB operations: XPATH, REGEX, etc.
 - [ ] Keep track of accessed context keys to optimize performance.
 - [ ] API to resolve sigils remotely, cache results, browse context, etc.
 - [ ] Benchmarking and performance improvements.

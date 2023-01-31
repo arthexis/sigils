@@ -1,5 +1,5 @@
 from .transforms import resolve
-from .contexts import context
+from .contexts import local_context
 
 
 class Sigil(str):
@@ -22,5 +22,8 @@ class Sigil(str):
 
     def __call__(self, *args, **kwargs):
         """Send all args and kwargs to context, then resolve."""
-        with context(*args, **kwargs):
+        with local_context(*args, **kwargs):
             return resolve(self.original, **self.kwargs)
+
+
+__all__ = ["Sigil"]

@@ -73,9 +73,14 @@ def extract(
                     buffer.clear()
 
 
-def _try_get_item(obj, key):
+def _try_get_item(obj, key, index=None):
     try:
-        return obj[key]
+        found = obj[key]
+        if index is not None:
+            if isinstance(found, str) and ';' in found:
+                found = found.split(';')
+            return found[index]
+        return found
     except (KeyError, TypeError):
         return None
 
@@ -95,7 +100,7 @@ def _try_manager(model):
     return getattr(model, "objects", None)
 
 
-class ContextTransformer(lark.Transformer):
+class SigilContextTransformer(lark.Transformer):
 
     def __init__(self, context: Mapping):
         super().__init__()
@@ -136,10 +141,8 @@ class ContextTransformer(lark.Transformer):
                 try:
                     logger.debug("Lookahead into the next node.")
                     name, param = stack.pop()
-                    if param:
-                        target = manager.get(**{name.casefold(): param})
-                    else:
-                        stack.append((name, param))
+                    if param: target = manager.get(**{name.casefold(): param})
+                    else: stack.append((name, param))
                 except IndexError:
                     pass  # Nothing to append back, pop failed
                 except RuntimeError as ex:
@@ -147,12 +150,9 @@ class ContextTransformer(lark.Transformer):
         elif callable(target):
             logger.debug("Root is callable, try to call.")
             target = _try_call(target, param)
-        elif param:
-            if isinstance(param, int):
-                param -= 1
-            if value := _try_get_item(target, param):
-                logger.debug(f"Lookup param '{param}' found.")
-                target = value
+        elif param and( value := _try_get_item(target, param)):
+            logger.debug(f"Lookup param '{param}' found.")
+            target = value
         else:
             logger.debug(f"No param, no lookup. Root: {name=}.")
         # Process additional nodes after the first (root)
@@ -162,7 +162,7 @@ class ContextTransformer(lark.Transformer):
             name, param = stack.pop()
             if isinstance(param, lark.Token): param = param.value
             logger.debug(f"Consume {name=} {param=}.")
-            if field := _try_get_item(target, name):
+            if field := _try_get_item(target, name, param):
                 # This finds items only (not attributes)
                 logger.debug(f"Field (exact) {name} found in {target}.")
                 target = _try_call(field, param) or field
@@ -171,12 +171,15 @@ class ContextTransformer(lark.Transformer):
                 logger.debug(f"Field (casefold) {name} found in {target}.")
                 target = _try_call(field, param) or field
             elif _filter := self._ctx_lookup(name):
+                # We don't casefold filters (they are not Model fields)
                 logger.debug(f"Filter {name} found in context.")
-                # Filters are called with the current target as the first arg
-                # This will fail if the function does not accept parameters
                 target = _try_call(_filter, target, param)
             else:
-                logger.debug("Unable to consume complete sigil at {name} in {target}.") 
+                logger.debug("Unable to consume full sigil {name} for {target}.") 
+        if isinstance(target, bytes):
+            return target.decode()
+        elif isinstance(target, (list, tuple)):
+            target = ";".join(target)
         return target
 
     # Flatten nodes (otherwise a Tree is returned)
@@ -194,3 +197,6 @@ class ContextTransformer(lark.Transformer):
         return int(value)
 
     null: bool = lambda self, _: ""
+
+
+__all__ = ["extract", "SigilContextTransformer"]

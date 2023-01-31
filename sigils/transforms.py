@@ -65,7 +65,7 @@ def resolve(
                 logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
             else:
                 tree = parsing.parse(sigil)
-                transformer = parsing.ContextTransformer(contexts._local.ctx)
+                transformer = parsing.SigilContextTransformer(contexts._local.ctx)
                 value = transformer.transform(tree).children[0]
                 logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
                 if cache:
@@ -119,3 +119,5 @@ def replace(
                 if hasattr(pattern, "__next__") else pattern))
     return text, tuple(sigils)
 
+
+__all__ = ["resolve", "replace", "OnError"]

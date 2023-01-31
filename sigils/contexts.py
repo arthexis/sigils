@@ -1,8 +1,10 @@
 import os
+import sys
 import uuid
 import collections
 import contextlib
 import threading
+from typing import Generator
 
 from lru import LRU
 
@@ -46,10 +48,10 @@ class System:
     def cwd(self): return os.getcwd()
 
     @property
-    def os_login(self): return os.getlogin()
+    def os(self): return os.name
 
     @property
-    def os_name(self): return os.name
+    def python(self): return sys.executable
 
 
 class ThreadLocal(threading.local):
@@ -57,8 +59,7 @@ class ThreadLocal(threading.local):
         self.ctx = collections.ChainMap({
             "SYS": System(),
             "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
-            "REAL": lambda x: float(x) if "." in x else int(x),
-            "NUMBER": lambda x: float(x) if "." in x else int(x),
+            "NUM": lambda x: float(x) if "." in x else int(x),
             "TRIM": lambda x: str(x).strip(),
             "STRIP": lambda x: str(x).strip(),
             "OR": lambda x, y: x or y,
@@ -76,17 +77,15 @@ class ThreadLocal(threading.local):
             "REVERSE": lambda x: x[::-1],
             "SORT": lambda x: sorted(x),
             "ITEM": lambda x, y: x[y],
-            "INDEX": lambda x, y: x.index(y),
-            "KEY": lambda x, y: x.get(y),
-            "ISO": lambda x: x.isoformat(),
+            "KEY": lambda x, y: x[y],
             "ANY": lambda x: any(x),
             "ALL": lambda x: all(x),
             "SUM": lambda x: sum(x),
             "MIN": lambda x: min(x),
             "MAX": lambda x: max(x),
+            "AVG": lambda x: sum(x) / len(x),
             "FIRST": lambda x: x[0],
             "LAST": lambda x: x[-1],
-            "COUNT": lambda x: x.count(),
             "ADD": lambda x, y: x + y,
             "SUB": lambda x, y: x - y,
             "MUL": lambda x, y: x * y,
@@ -100,16 +99,12 @@ class ThreadLocal(threading.local):
             "GTE": lambda x, y: x >= y,
             "IN": lambda x, y: x in y,
             "CONTAINS": lambda x, y: y in x,
-            "STARTS": lambda x, y: x.startswith(y),	
-            "ENDS": lambda x, y: x.endswith(y),
             "TYPE": lambda x: type(x).__name__,
-            "IS": lambda x, y: isinstance(x, y),
             "FLAT": lambda x: [i for j in x for i in j],
-            "PREFIX": lambda x, y: f"{y}{x}",
-            "SUFFIX": lambda x, y: f"{x}{y}",
-            "LSPLIT": lambda x, y: str(x).split(y, 1)[0],
-            "RSPLIT": lambda x, y: str(x).rsplit(y, 1)[1],
+            "ROUND": lambda x, y: round(x, y or 0),
+            "ABS": lambda x: abs(x),
             "SPLIT": lambda x, y: str(x).split(y),
+            "WORD": lambda x, y: str(x).split()[y],
         })
         self.lru = LRU(128)
         # Add default context sources and thread local variables here
@@ -119,7 +114,7 @@ _local = ThreadLocal()
 
 
 @contextlib.contextmanager
-def context(*args, **kwargs) -> collections.ChainMap:
+def local_context(*args, **kwargs) -> Generator[collections.ChainMap, None, None]:
     """Update the local context used for resolving sigils temporarily.
 
     :param args: A tuple of context sources.
@@ -139,3 +134,12 @@ def context(*args, **kwargs) -> collections.ChainMap:
     yield _local.ctx
     _local.ctx = _local.ctx.parents
     _local.lru.clear()
+
+
+def global_context() -> collections.ChainMap:
+    """Return the existing global context."""
+    global _local
+    return _local.ctx._local.ctx
+
+
+__all__ = ["local_context", "global_context"]	

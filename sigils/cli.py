@@ -1,6 +1,6 @@
 import sys
 import logging
-from .sigils import Sigil, context
+from .sigils import Sigil, local_context
 
 def main():
     global DEBUG
@@ -26,6 +26,9 @@ def main():
     else:
         kwargs = {}
 
-    with context(**kwargs):
+    with local_context(**kwargs):
         logging.debug(f"Command-line context: {kwargs}")
         print(Sigil(sys.argv[1]))
+
+
+__all__ = ["main"]

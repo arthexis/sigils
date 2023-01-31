@@ -4,7 +4,7 @@ import pathlib
 import pytest
 
 from ..transforms import *  # Module under test
-from ..contexts import context
+from ..contexts import local_context
 
 
 TEST_DIR = pathlib.Path(__file__).parent.absolute()
@@ -23,5 +23,5 @@ def test_config_file(config):
 
 
 def test_context_from_config(config):
-    with context(config):
+    with local_context(config):
         assert resolve("[DEV.HOST]") == "localhost"
