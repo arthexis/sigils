@@ -8,7 +8,7 @@ version = "0.1.3"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
-description = "Extract, resolve, replace and connect [SIGILS] embedded in text."
+description = "Extract, resolve, replace and define [SIGILS] in any text."
 readme = "README.rst"
 requires-python = ">=3.9"
 keywords = ["utils", "sigils", "string", "text", "magic", "context"]
@@ -36,10 +36,12 @@ Source = "https://github.com/arthexis/sigils"
 
 [project.optional-dependencies]
 django = ["Django>=3.2"]
-dev = ["pytest", "pytest-cov", "python-dotenv"]
+dev = [
+    "pytest", 
+    "pytest-cov", 
+    "python-dotenv"
+]
 
 [project.scripts]
 sigils = "sigils.cli:main"
-
-
 
