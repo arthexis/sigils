@@ -181,11 +181,3 @@ def test_get_python():
     import sys
     assert resolve("[SYS.PYTHON]") == sys.executable
 
-
-# Test EQ and NEQ
-def test_eq():
-    with local_context(A=1, B=2):
-        assert resolve("[A.EQ=1]") == "True"
-        assert resolve("[A.EQ=2]") == "False"
-        assert resolve("[A.NEQ=1]") == "False"
-        assert resolve("[A.NEQ=2]") == "True"

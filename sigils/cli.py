@@ -27,7 +27,6 @@ def main():
         kwargs = {}
 
     with local_context(**kwargs):
-        logging.debug(f"Command-line context: {kwargs}")
         print(Sigil(sys.argv[1]))
 
 

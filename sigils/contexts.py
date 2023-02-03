@@ -56,6 +56,7 @@ class System:
 
 class ThreadLocal(threading.local):
     def __init__(self):
+        # These will be the default filters and objects
         self.ctx = collections.ChainMap({
             "SYS": System(),
             "JOIN": lambda o, s: (s or "").join(str(i) for i in o),
@@ -130,7 +131,6 @@ def local_context(*args, **kwargs) -> Generator[collections.ChainMap, None, None
     for arg in args:
         for key, val in arg.items():
             _local.ctx[key] = val
-    logger.debug("Context: %s", _local.ctx)
     yield _local.ctx
     _local.ctx = _local.ctx.parents
     _local.lru.clear()

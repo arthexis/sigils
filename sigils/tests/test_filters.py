@@ -87,3 +87,40 @@ def test_second_word():
         assert resolve("[HELLO.WORD=1]") == "Foo"
 
 
+# Test EQ and NEQ
+def test_eq():
+    with local_context(A=1, B=2):
+        assert resolve("[A.EQ=1]") == "True"
+        assert resolve("[A.EQ=2]") == "False"
+        assert resolve("[A.NEQ=1]") == "False"
+        assert resolve("[A.NEQ=2]") == "True"
+
+
+# Test LT and GT
+def test_lt_gt():
+    with local_context(A=1, B=2):
+        assert resolve("[A.LT=2]") == "True"
+        assert resolve("[A.LT=1]") == "False"
+        assert resolve("[A.GT=2]") == "False"
+        assert resolve("[A.GT=0]") == "True"
+
+
+# Test LTE and GTE
+def test_lte_gte():
+    with local_context(A=1, B=2):
+        assert resolve("[A.LTE=2]") == "True"
+        assert resolve("[A.LTE=1]") == "True"
+        assert resolve("[A.LTE=0]") == "False"
+        assert resolve("[A.GTE=2]") == "False"
+        assert resolve("[A.GTE=1]") == "True"
+        assert resolve("[A.GTE=0]") == "True"
+
+
+# Test arithmetic
+def test_arithmetic():
+    with local_context(A=1, B=2):
+        assert resolve("[A.ADD=[B]]") == "3"
+        assert resolve("[A.SUB=[B]]") == "-1"
+        assert resolve("[A.MUL=[B]]") == "2"
+        assert resolve("[A.DIV=[B]]") == "0.5"
+        assert resolve("[A.MOD=[B]]") == "1"
