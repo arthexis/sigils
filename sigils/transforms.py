@@ -62,12 +62,12 @@ def resolve(
             # each sigil in isolation and in a single pass
             if cache and sigil in contexts._local.lru:
                 value = contexts._local.lru[sigil]
-                logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
+                # logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
             else:
                 tree = parsing.parse(sigil)
                 transformer = parsing.SigilContextTransformer(contexts._local.ctx)
                 value = transformer.transform(tree).children[0]
-                logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
+                # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
                 if cache:
                     contexts._local.lru[sigil] = value
             if value is not None:

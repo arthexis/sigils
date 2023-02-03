@@ -87,12 +87,12 @@ def _try_get_item(obj, key, index=None):
 
 def _try_call(func, *args) -> Union[None, str]:
     if callable(func):
-        logger.debug(f"Callable, try with {args=}.")
+        # logger.debug(f"Callable, try with {args=}.")
         args = tuple(arg for arg in args if arg is not None)
         if args: return func(*args)
         else: return func()
     else:
-        logger.debug(f"Non-callable {func}.")
+        # logger.debug(f"Non-callable {func}.")
         return None
 
 
@@ -107,30 +107,30 @@ class SigilContextTransformer(lark.Transformer):
         self.ctx = context
 
     def _ctx_lookup(self, key):
-        logger.debug(f"Context lookup: {key}")
+        # logger.debug(f"Context lookup: {key}")
         try:
             value = self.ctx[key]
-            logger.debug(f"Found {type(value)} {value}")
+            # logger.debug(f"Found {type(value)} {value}")
             return value
         except KeyError as ex:
-            logger.debug(f"{key} not found.")
+            # logger.debug(f"{key} not found.")
             raise ex
 
     @lark.v_args(inline=True)
     def sigil(self, *nodes):
         stack = list(nodes[::-1])
-        logger.debug(f"Resolving node stack {stack}.")
+        # logger.debug(f"Resolving node stack {stack}.")
         # Process the first node (root)
         name, param = stack.pop()
         if isinstance(param, lark.Token): param = param.value
         if not (target := self._ctx_lookup(name)):
-            logger.debug(f"Root '{name}' not found in context.")
+            # logger.debug(f"Root '{name}' not found in context.")
             return
         if manager := _try_manager(target):
             # We don't want to find managers after the first node
             logger.debug("Found 'objects' attribute, treat as Django Model.")
             if param:
-                logger.debug(f"Search by pk={param}")
+                # logger.debug(f"Search by pk={param}")
                 if instance := manager.get(pk=param):
                     logger.debug(f"Found instance with pk={param}.")
                     target = instance
@@ -139,7 +139,7 @@ class SigilContextTransformer(lark.Transformer):
                     target = instance
             else:
                 try:
-                    logger.debug("Lookahead into the next node.")
+                    # logger.debug("Lookahead into the next node.")
                     name, param = stack.pop()
                     if param: target = manager.get(**{name.casefold(): param})
                     else: stack.append((name, param))
@@ -148,10 +148,10 @@ class SigilContextTransformer(lark.Transformer):
                 except RuntimeError as ex:
                     stack.append((name, param))
         elif callable(target):
-            logger.debug("Root is callable, try to call.")
+            # logger.debug("Root is callable, try to call.")
             target = _try_call(target, param)
         elif param and( value := _try_get_item(target, param)):
-            logger.debug(f"Lookup param '{param}' found.")
+            # logger.debug(f"Lookup param '{param}' found.")
             target = value
         else:
             logger.debug(f"No param, no lookup. Root: {name=}.")
@@ -161,7 +161,7 @@ class SigilContextTransformer(lark.Transformer):
             # TODO: Use a match statement?
             name, param = stack.pop()
             if isinstance(param, lark.Token): param = param.value
-            logger.debug(f"Consume {name=} {param=}.")
+            # logger.debug(f"Consume {name=} {param=}.")
             if field := _try_get_item(target, name, param):
                 # This finds items only (not attributes)
                 logger.debug(f"Field (exact) {name} found in {target}.")
