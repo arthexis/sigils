@@ -149,5 +149,5 @@ func()
         with local_context(USERPARAM="World"):
             execute(code)
     assert stdout.getvalue() == "Hello World\n"
-    
+
 
