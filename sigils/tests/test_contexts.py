@@ -5,7 +5,7 @@ import pytest
 from ..transforms import *  # Module under test
 from ..errors import SigilError
 from ..sigils import Sigil
-from ..contexts import local_context
+from ..contexts import local_context, global_context
 
 
 def test_sigil_with_simple_context():
@@ -81,7 +81,7 @@ def test_call_lambda_error():
             resolve("[DIVIDE_BY_ZERO=1]", on_error=OnError.RAISE)
 
 
-def test_item_subscript():
+def test_subitem_subscript():
     with local_context(A={"B": "C"}):
         assert resolve("[A.B]") == "C"
 
@@ -99,10 +99,11 @@ def test_required_key_not_in_context():
 
 
 def test_replace_duplicated():
-    text = "User: [USER], Manager: [USER], Company: [ORG]"
-    text, sigils = replace(text, "%s")
-    assert text == "User: %s, Manager: %s, Company: %s"
-    assert sigils == ("[USER]", "[USER]", "[ORG]")
+    # TODO: Fix this test
+    text = "User: [U], Manager: [U], Company: [ORG]"
+    text, sigils = replace(text, "X")
+    assert sigils == ("[U]", "[U]", "[ORG]")
+    assert text == "User: X, Manager: X, Company: X"
 
 
 def test_cache_value_is_used():
@@ -180,4 +181,16 @@ def test_get_pid():
 def test_get_python():
     import sys
     assert resolve("[SYS.PYTHON]") == sys.executable
+
+
+# Test global_context
+def test_global_context():
+    global_context()["USER"] = "arthex1s"
+    assert resolve("[USER]") == "arthex1s"
+
+
+# Test global_context
+def test_global_context_set_key():
+    global_context("USERA", "arthexe4s")
+    assert resolve("[USERA]") == "arthexe4s"
 

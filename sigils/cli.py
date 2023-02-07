@@ -20,9 +20,6 @@ def main():
     if sys.argv[2:]:
         kwargs = dict(arg.split("=") for arg in sys.argv[2:] if "=" in arg)
         kwargs = {key.upper(): value for key, value in kwargs.items()}
-        args = [arg for arg in sys.argv[2:] if "=" not in arg]
-        if args:
-            kwargs["ARGS"] = args
     else:
         kwargs = {}
 

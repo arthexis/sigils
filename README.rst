@@ -15,6 +15,8 @@ They can be useful for generating forms, URLs, SQL, etc. specially for rapid pro
 
 This library includes tools to extract, resolve, replace and define sigils.
 
+It works with Django OOTB, but it can be used in any Python project.
+
 
 .. _Documentation:
 
@@ -198,6 +200,22 @@ This may also be useful for debugging and logging. For example:
     assert sigils == ["[USER]"]
 
 
+Environment Variables
+---------------------
+
+The *resolve* function can also replace environment variables by using
+the SYS.ENV sigil. For example:
+
+.. code-block:: python
+
+    import os
+    from sigils import resolve
+
+    os.environ["MY_VAR"] = "value"
+    assert resolve("[SYS.ENV.MY_VAR]") == "value"
+
+
+
 Django Integration
 ------------------
 
@@ -262,8 +280,8 @@ Features Roadmap
 - [X] Add 'sigil' project script to pyproject.toml.
 - [ ] Improved built-in support for Django models.
 - [X] Improved access to environment variables within SYS context.
-- [ ] Support for custom gobal-level context functions (probably via a decorator).
-- [ ] Support for list indexing and slicing.
+- [ ] Support for custom global-level context functions (probably via a decorator).
+- [X] Support for list indexing and slicing.
 - [ ] Ability to monkey-patch sigil functionality into existing classes.
 - [ ] Ability to load context from a JSON, YAML, or TOML file.
 - [ ] Consider additional OOTB operations: XPATH, REGEX, etc.

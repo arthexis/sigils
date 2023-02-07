@@ -1,3 +1,4 @@
+import ast
 from enum import Enum
 from typing import Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
 
@@ -20,7 +21,7 @@ def resolve(
         serializer: Callable[[Any], str] = str,
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
-        recursion_limit: int = 20,
+        recursion_limit: int = 1,
         cache: bool = True,
 ) -> str:
     """
@@ -37,7 +38,7 @@ def resolve(
     :param default: Value to use when the sigils resolves to None, defaults to "".
     :param recursion_limit: If greater than zero, and the output of a resolved sigil
         contains other sigils, resolve them as well until no sigils remain or
-        until the recursion limit is reached (default 20).
+        until the recursion limit is reached (default 1).
     :param cache: Use an LRU cache to store resolved sigils (default True).
 
     >>> # Resolving sigils using context:
@@ -51,11 +52,11 @@ def resolve(
     sigils = set(parsing.extract(text))
 
     if not sigils:
-        logger.debug(f"No more sigils in '{text}'.")
+        # logger.debug(f"No more sigils in '{text}'.")
         return text  # Not an error, just do nothing
 
     results = []
-    logger.debug(f"Extracted sigils: {sigils}.")
+    # logger.debug(f"Extracted sigils: {sigils}.")
     for sigil in sigils:
         try:
             # By using a lark transformer, we parse and resolve
@@ -80,18 +81,17 @@ def resolve(
                         default,
                         recursion_limit=(recursion_limit - 1)
                     )
-            text = text.replace(sigil, fragment)
+                text = text.replace(sigil, fragment)
         except Exception as ex:
             if on_error == OnError.RAISE:
                 raise errors.SigilError(sigil) from ex
             elif on_error == OnError.REMOVE:
                 text = text.replace(sigil, "")
             elif on_error == OnError.DEFAULT:
-                text = text.replace(sigil, default)
-            logger.debug(f"Sigil '{sigil}' could not be resolved:\n{ex}")
-
+                text = text.replace(sigil, str(default))
+            # logger.debug(f"Sigil '{sigil}' could not be resolved:\n{ex}")
     if results:
-        return results if len(results) > 1 else results[0]
+        return str(results) if len(results) > 1 else str(results[0])
     return text
 
 
@@ -114,10 +114,36 @@ def replace(
     """
 
     sigils = list(parsing.extract(text))
+    _iter = (iter(pattern) if isinstance(pattern, Iterator) 
+             else iter(pattern * len(sigils)))
     for sigil in set(sigils):
-        text = (text.replace(sigil, str(next(pattern)) 
-                if hasattr(pattern, "__next__") else pattern))
+        text = (text.replace(sigil, str(next(_iter)) or sigil))
     return text, tuple(sigils)
 
 
-__all__ = ["resolve", "replace", "OnError"]
+def execute(
+        code: str,
+        on_error: str = OnError.DEFAULT,
+        default: Optional[str] = "",
+        recursion_limit: int = 1,
+        cache: bool = True,
+        _locals: Optional[dict[str, Any]] = None,
+        _globals: Optional[dict[str, Any]] = None,
+) -> Union[str, None]:
+    """Execute a Python code block after resolving any sigils appearing in 
+    it's strings. Sigils appearing outside of strings are not resolved.
+    """
+    tree = ast.parse(code)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Str):
+            node.s = resolve(
+                node.s, 
+                on_error=on_error, 
+                default=default, 
+                recursion_limit=recursion_limit, 
+                cache=cache
+            )   
+    exec(compile(tree, "<string>", "exec"), _globals, _locals)
+
+
+__all__ = ["resolve", "replace", "execute", "OnError"]

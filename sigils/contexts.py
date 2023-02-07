@@ -4,7 +4,7 @@ import uuid
 import collections
 import contextlib
 import threading
-from typing import Generator
+from typing import Generator, Optional, Any
 
 from lru import LRU
 
@@ -36,9 +36,6 @@ class System:
     def now(self): return datetime.now()
 
     @property
-    def today(self): return datetime.today()
-
-    @property
     def uuid(self): return str(uuid.uuid4()).replace('-', '')
 
     @property
@@ -52,6 +49,12 @@ class System:
 
     @property
     def python(self): return sys.executable
+
+    @property
+    def argv(self): return sys.argv
+
+    @property
+    def version(self): return sys.version
 
 
 class ThreadLocal(threading.local):
@@ -136,10 +139,26 @@ def local_context(*args, **kwargs) -> Generator[collections.ChainMap, None, None
     _local.lru.clear()
 
 
-def global_context() -> collections.ChainMap:
-    """Return the existing global context."""
+def global_context(key: Optional[str] = None, value: Any = None) -> Any:
+    """Get or set a global context value.
+    
+    :param key: The key to get or set.
+    :param value: The value to set.
+    :return: The value of the key or the entire context.
+
+    >>> # Get the entire context
+    >>> global_context()
+    >>> # Get a value from the context
+    >>> global_context("TEXT")
+    >>> # Set a value in the context
+    >>> global_context("TEXT", "hello world")
+    """
     global _local
-    return _local.ctx._local.ctx
+    if key and value is None:
+        return _local.ctx[key]
+    elif key and value is not None:
+        _local.ctx[key] = value
+    return _local.ctx
 
 
 __all__ = ["local_context", "global_context"]	

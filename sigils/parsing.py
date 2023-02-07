@@ -153,26 +153,22 @@ class SigilContextTransformer(lark.Transformer):
         elif param and( value := _try_get_item(target, param)):
             # logger.debug(f"Lookup param '{param}' found.")
             target = value
-        else:
-            logger.debug(f"No param, no lookup. Root: {name=}.")
         # Process additional nodes after the first (root)
-        logger.debug(f"Target: {target} {stack=}.")
         while stack:
-            # TODO: Use a match statement?
             name, param = stack.pop()
             if isinstance(param, lark.Token): param = param.value
             # logger.debug(f"Consume {name=} {param=}.")
             if field := _try_get_item(target, name, param):
                 # This finds items only (not attributes)
-                logger.debug(f"Field (exact) {name} found in {target}.")
+                # logger.debug(f"Field (exact) {name} found in {target}.")
                 target = _try_call(field, param) or field
             elif field := getattr(target, name.casefold(), None):
                 # Casefold is used to find Model fields, properties and methods
-                logger.debug(f"Field (casefold) {name} found in {target}.")
+                # logger.debug(f"Field (casefold) {name} found in {target}.")
                 target = _try_call(field, param) or field
             elif _filter := self._ctx_lookup(name):
                 # We don't casefold filters (they are not Model fields)
-                logger.debug(f"Filter {name} found in context.")
+                # logger.debug(f"Filter {name} found in context.")
                 target = _try_call(_filter, target, param)
             else:
                 logger.debug("Unable to consume full sigil {name} for {target}.") 
@@ -194,9 +190,9 @@ class SigilContextTransformer(lark.Transformer):
 
     @lark.v_args(inline=True)
     def integer(self, value=None):
-        return int(value)
+        return int(str(value))
 
-    null: bool = lambda self, _: ""
+    null = lambda self, _: ""
 
 
 __all__ = ["extract", "SigilContextTransformer"]

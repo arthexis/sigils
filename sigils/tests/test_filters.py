@@ -124,3 +124,30 @@ def test_arithmetic():
         assert resolve("[A.MUL=[B]]") == "2"
         assert resolve("[A.DIV=[B]]") == "0.5"
         assert resolve("[A.MOD=[B]]") == "1"
+
+
+# Test setting and reading environment variables
+def test_env():
+    import os
+    os.environ["FOO"] = "BAR"
+    assert resolve("[SYS.ENV.FOO]") == "BAR"
+
+
+# Test executing a block of python code
+def test_execute_python_code():
+    code = """
+def func():
+    print("Hello [USERPARAM]")
+    return "Hello World"
+func()
+    """
+    import io
+    import contextlib
+    # Capture stdout
+    stdout = io.StringIO()
+    with contextlib.redirect_stdout(stdout):
+        with local_context(USERPARAM="World"):
+            execute(code)
+    assert stdout.getvalue() == "Hello World\n"
+    
+

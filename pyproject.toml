@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.1.4"
+version = "0.1.5"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
@@ -31,8 +31,10 @@ dependencies = [
     'lru-dict'
 ]
 
-[urls]
+[project.urls]
 Source = "https://github.com/arthexis/sigils"
+Bug-Tracker = "https://github.com/arthexis/sigils/issues"
+
 
 [project.optional-dependencies]
 django = ["Django>=3.2"]
