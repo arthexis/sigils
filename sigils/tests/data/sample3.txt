@@ -1,0 +1,3 @@
+Server: [[$ENV.HOST]]
+Client: [[$ENV.CLIENT]]
+Path: [[$ENV.PATH]]

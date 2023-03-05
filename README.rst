@@ -1,9 +1,9 @@
 Sigils
 ======
 
-*An inscribed or painted symbol considered to have magical power.*
+*Inscribed or painted symbols considered to have magical power.*
 
-A **sigil** is a universal token embedded in text, used as a placeholder for out-of-context values. 
+A **sigil** is a universal token embedded in text, used as placeholder for out-of-context values. 
 When resolved, the actual value is determined from a configurable thread-local context 
 and interpolated into the text with proper formatting, extracted as a mapping, sanitized, etc.
 
@@ -25,10 +25,10 @@ Sigils can be anywhere.
 .. _Documentation:
 
 
-Installing
-----------
+Installation
+------------
 
-Install and update using `pip`_:
+Install and update from PyPI:
 
 .. code-block:: text
 
@@ -55,7 +55,7 @@ Natural means, use the natural context to figure out the value.
 If parametrized, they can take an **argument** using the equals sign. 
 
 The argument can be a number, a quoted string, or another sigil.
-When thye argument is a sigil, only use one brace pair.
+When the argument is a sigil, only one brace pair is needed.
 
 .. code-block:: text
 
@@ -107,7 +107,7 @@ also allows piping the result of one sigil into another. For example:
     [[MODEL='natural-key'.FIELD.UPPER]]
     [[USER.NAME.UPPER.TRIM]]
     [[USER='arthexis@gmail.com'.DOMAIN.SLUG]]
-    [[USER=[[USERNAME.TRIM]].DOMAIN.SLUG]]
+    [[USER=[USERNAME.TRIM].DOMAIN.SLUG]]
 
 
 The function after ``.`` can be a built-in function, one found in the current context, 
@@ -198,45 +198,87 @@ Currently, the following built-in functions are available *everywhere*:
 * ``FLAT``: flatten the found value
 * ``UNIQ``: return the unique items of the found value
 * ``ZIP``: zip the found value with the argument
+* ``SIG``: treat the found value as a sigil (recursive interpolation)
 * ``WORD``: return the Nth word of the found value
 
+The SYS root function can be used to access system variables and special
+functions. The sub-functions available may change depending on the context,
+the current environment, user privileges and the installed packages. 
 
-Reserved Characters
--------------------
+Currently these are available in all contexts:
 
-The following characters are reserved and cannot be used for sigils
-(but they can be used in the argument):
+* ``ENV``: access environment variables
+* ``ARGS``: access all command-line arguments as a list
+* ``OPTS``: idem
+* ``NOW``: return the current datetime
+* ``TODAY``: return the current date
+* ``TIME``: return the current time
+* ``UUID``: return a new UUID
+* ``RNG``: return a random number
+* ``PI``: return the value of pi
+* ``PID``: return the current process ID
+* ``PYTHON``: return the path to the python executable
+* ``PY_VER``: return the version of the python interpreter
+* ``SIG_VER``: return the version of the sigils package
+* ``OS``: return the operating system name
+* ``ARCH``: return the operating system architecture
+* ``HOST``: return the hostname
+* ``IP``: return the IP address
+* ``USER``: return the username
+* ``HOME``: return the home directory
+* ``PWD``: return the current working directory
+* ``CWD``: as above
+* ``TMP``: return the path to the temporary directory
+
+The special root `$` can be used instead of `SYS.`, for example:
+
+.. code-block:: python
+
+    from sigils import resolve
+
+    assert resolve("[[$ENV.PATH]]") == os.environ["PATH"]
+    assert resolve("[[$ARGS.0]]") == sys.argv[0]
+
+
+Special and Reserved Characters
+-------------------------------
+
+The following characters are reserved and cannot be used inside sigils, 
+except as specified in this document:
 
 * ``[[`` and ``]]``: delimiters
 * ``.``: node separator or function call
 * ``'`` and ``"``: string delimiters
 * ``=``: argument or natural key separator
 * ``\``: escape character
+* ``$``: reserved for SYS. shorthand
+* ``(`` and ``)``: reserved for future use
 
 Quotes can be used interchangeably, but they must be balanced.
 
 
-The Four Main Tools
--------------------
+Four Tools are Available
+------------------------
 
-The *pull* function extracts all sigils from a string and returns a list of them,
-without replacing or resolving. 
-
-.. code-block:: python
-
-    from sigils import extract
-
-    assert pull("select * from users where username = [[USER]]") == ["[[USER]]"]
-
-
-Pull is a fast way to check if a string contains sigils without hitting the ORM. 
-For example:
+The *spool* function iterates over all sigils in a string, yielding each one
+in the same order they appear in the string, without resolving them.
 
 .. code-block:: python
 
-    from sigils import pull
+    from sigils import spool
 
-    if sigil_map := pull(text):
+    sql = "select * from users where username = [[USER]]"
+    assert list(spool(sql)) == ["[[USER]]"]
+
+
+Spoolling is a fast way to check if a string contains sigils without hitting the ORM
+or the network. For example:
+
+.. code-block:: python
+
+    from sigils import spool
+
+    if sigils := set(spool(text)):
         # do something with sigils
     else:
         # do something else
@@ -278,18 +320,33 @@ You can pass additional context to resolve directly:
     assert resolve("[[NAME.UPPER]]", context={"NAME": "arth"}) == "ARTH"
 
 
-The *exec* function is similar to resolve, but executes the final text 
-as a python expression. This is useful for interpolating code, for example:
+The *execute* function is similar to resolve, but executes the found text 
+as a python block (not an expression). This is useful for interpolating code:
 
 .. code-block:: python
 
-    from sigils import exec, context
+    from sigils import execute, context
 
     with context(
         USERNAME="arthexis",
         SETTING={"BASE_DIR": "/home/arth/webapp"},
     ):
-        result = exec("print([[USERNAME]])")
+        result = execute("print('[[USERNAME]]')")
+        assert result == "arthexis"
+        
+
+Sigils will only be resolved within strings inside the code unless
+the unsafe flag is set to True. For example:
+
+.. code-block:: python
+
+    from sigils import execute, context
+
+    with context(
+        USERNAME="arthexis",
+        SETTING={"BASE_DIR": "/home/arth/webapp"},
+    ):
+        result = execute("print([[USERNAME]])", unsafe=True)
         assert result == "arthexis"
 
 
@@ -307,20 +364,26 @@ or to sanitize user input that might contain sigils.
     assert sigils == ["[[USER]]"]
 
 
+Async & Multiprocessing
+-----------------------
 
-Environment Variables
----------------------
-
-The *resolve* function can replace environment variables anywhere by using
-the SYS.ENV root sigil. For example:
+All sigils are resolved asynchronously and in-parallel, so you can use 
+them in loops, conditionals, and other control structures. For example:
 
 .. code-block:: python
 
-    import os
-    from sigils import resolve
+    from sigils import execute, context
 
-    os.environ["MY_VAR"] = "value"
-    assert resolve("[[SYS.ENV.MY_VAR]]") == "value"
+    with context(
+        USERNAME="arthexis",
+        SETTING={"BASE_DIR": "/home/arth/webapp"},
+    ):
+        result = execute("if [[USERNAME]] == 'arthexis': print('yes')")
+        assert result == "yes"
+
+
+This can also make it more efficient to resolve documents with many sigils,
+instead of resolving each one individually.
 
 
 Django Integration
@@ -368,13 +431,32 @@ Then you can use something like this in your template:
 .. code-block:: django
 
     {% load sigils %}
-    {% sigil '[[SOME_MODEL=[[USER]].some_field]]' %}
+    {% sigil '[[SOME_MODEL=[USER].SOME_FIELD]]' %}
 
 .. _simple tag: https://docs.djangoproject.com/en/2.2/howto/custom-template-tags/#simple-tags
+
+
+Feature Requests & Bug Reports
+------------------------------
+
+All feature requests and bug reports are welcome. Please open an issue on 
+`GitHub Issues`_.
+
+.. _GitHub Issues: https://github.com/arthexis/sigils/issues
+
+Issues must use one of the approved templates. If you don't know which one
+to use, use the "Bug Report" template. 
 
 
 Project Dependencies
 --------------------
 
 .. _lark: https://github.com/lark-parser/lark
-.. _pip: https://pip.pypa.io/en/stable/quickstart/
+.. _lru-dict: https://github.com/amitdev/lru-dict
+.. _pytest: https://docs.pytest.org/en/7.2.x/
+
+
+Special Thanks
+--------------
+
+Katia Larissa Jasso García, for the name "sigils".

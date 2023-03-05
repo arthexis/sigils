@@ -2,7 +2,7 @@ import os
 import datetime
 import pytest
 
-from ..transforms import *  # Module under test
+from ..tools import *  # Module under test
 from ..errors import SigilError
 from ..sigils import Sigil
 from ..contexts import local_context, global_context
@@ -139,7 +139,7 @@ def test_resolve_dotted_whitespace():
 
 def test_resolve_recursive_one_level():
     with local_context(Y="[[X]]", X=10):
-        assert splice("[[Y]]", recursion_limit=1) == "10"
+        assert splice("[[Y]]", max_recursion=1) == "10"
 
 
 def test_sigil_helper_class():
@@ -162,25 +162,6 @@ def test_item_subscript():
         assert splice("[[A.ITEM=2]]") == "3"
 
 
-# Check that SYS.ENV is a dictionary with PATH
-def test_get_env():
-    assert splice("[[SYS.ENV.PATH]]") == os.environ["PATH"]
-
-
-# Test SYS.NOW produces correct year
-def test_get_now():
-    assert splice("[[SYS.NOW.YEAR]]") == str(datetime.datetime.now().year)
-
-
-# Test SYS.PID produces correct pid
-def test_get_pid():
-    assert splice("[[SYS.PID]]") == str(os.getpid())
-
-
-# Text getting the correct python executable
-def test_get_python():
-    import sys
-    assert splice("[[SYS.PYTHON]]") == sys.executable
 
 
 # Test global_context

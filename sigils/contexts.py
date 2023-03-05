@@ -1,8 +1,11 @@
 import os
 import sys
 import uuid
+import math
 import json
+import random
 import base64
+import socket
 import urllib.parse
 import collections
 import contextlib
@@ -26,6 +29,9 @@ except ImportError:
 class System:
     """Used for the SYS default context."""
 
+    # TODO: Check user privileges before accessing SYS 
+    # TODO: Missing tests
+
     class _Env:
         def __getitem__(self, item):
             return os.getenv(item.upper())
@@ -34,31 +40,69 @@ class System:
 
     @property
     def env(self): return System._env
-    
+            
+    @property
+    def args(self): return sys.argv[1:]
+
     @property
     def now(self): return datetime.now()
+
+    @property
+    def today(self): return datetime.now().date()
+
+    @property
+    def time(self): return datetime.now().time()
 
     @property
     def uuid(self): return str(uuid.uuid4()).replace('-', '')
 
     @property
-    def pid(self): return os.getpid()
+    def rng(self): return random.random()
 
     @property
-    def cwd(self): return os.getcwd()
+    def pid(self): return os.getpid()
+
+    @property   
+    def pi(self): return math.pi
 
     @property
     def os(self): return os.name
 
     @property
+    def arch(self): return sys.platform
+
+    @property
+    def host(self): return socket.gethostname()
+
+    @property
+    def ip(self): return socket.gethostbyname(socket.gethostname())
+
+    @property
+    def user(self): return os.getlogin()
+
+    @property
+    def home(self): return os.path.expanduser("~")
+
+    @property
     def python(self): return sys.executable
 
     @property
-    def argv(self): return sys.argv
+    def py_ver(self): return sys.version
 
     @property
-    def version(self): return sys.version
+    def sig_ver(self): 
+        # TODO: Missing tests
+        with open(os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")) as f:
+            return json.loads(f.read())["project"]["version"]
+        
+    @property
+    def pwd(self): return os.getcwd()
 
+    @property
+    def cwd(self): return os.getcwd()
+        
+    @property
+    def tmp(self): return os.path.join(os.getcwd(), "tmp")
 
 class ThreadLocal(threading.local):
     def __init__(self):
@@ -131,7 +175,7 @@ class ThreadLocal(threading.local):
             "ESC": lambda x: x.replace("\\", "\\\\").replace('"', '\\"'),
             "UNIQ": lambda x: list(set(x)),
             "ZIP": lambda x, y: list(zip(x, y)),
-            "SIGIL": lambda x: f"[[{x}]]",
+            "SIG": lambda x: f"[[{x}]]",
             "WORD": lambda x, y: x.split()[y],
         })
         self.lru = LRU(128)

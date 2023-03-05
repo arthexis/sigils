@@ -32,7 +32,7 @@ _parser = lark.Lark(GRAMMAR)
 parse = _parser.parse
 
 
-def pull(
+def spool(
         text: Union[str, TextIO],
         left: str = "[[",
         right: str = "]]"
@@ -67,7 +67,10 @@ def pull(
             if text.read(1) == left[1]:
                 depth += 1
         if depth > 0:
-            buffer.append(char)
+            if char == '$':
+                buffer.append("SYS.")
+            else:
+                buffer.append(char)
             if char == _right:
                 if text.read(1) == right[1]:
                     depth -= 1
@@ -199,4 +202,4 @@ class SigilContextTransformer(lark.Transformer):
     null = lambda self, _: ""
 
 
-__all__ = ["pull", "SigilContextTransformer"]
+__all__ = ["spool", "SigilContextTransformer"]

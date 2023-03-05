@@ -1,4 +1,4 @@
-from .transforms import splice
+from .tools import splice
 from .contexts import local_context
 
 

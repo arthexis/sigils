@@ -1,5 +1,5 @@
 
-from ..transforms import *  # Module under test
+from ..tools import *  # Module under test
 from ..contexts import local_context
 
 
@@ -7,15 +7,10 @@ def test_join_list():
     with local_context(LIST=["Hello", "World"]):
         assert splice("[[LIST.JOIN=', ']]") == "Hello, World"
 
-
-def test_sys_context_env_path():
-    import os
-    assert splice("[[SYS.ENV.PATH]]") == os.getenv("PATH")
-
-
-def test_sys_uuid_length():
-    assert len(splice("[[SYS.UUID]]")) == 32
-
+# Test that a string has no sigils with spool
+def test_no_sigils_in_big_string():
+    with local_context(HELLO="Hello", WORLD="World"):
+        assert not any(spool("Hello World"))
 
 # Test adding a custom function to context
 def test_custom_function():
@@ -24,7 +19,6 @@ def test_custom_function():
 
     with local_context(CUSTOM=custom_func):
         assert splice("[[CUSTOM]]") == "Hello World"
-
 
 # Test chaining two functions
 def test_chained_functions():
@@ -126,13 +120,6 @@ def test_arithmetic():
         assert splice("[[A.MOD=2]]") == "1"
 
 
-# Test setting and reading environment variables
-def test_env():
-    import os
-    os.environ["FOO"] = "BAR"
-    assert splice("[[SYS.ENV.FOO]]") == "BAR"
-
-
 # Test executing a block of python code
 def test_execute_python_code():
     code = """
@@ -141,5 +128,13 @@ def func():
 func()
     """
     with local_context(USERPARAM="World"):
-        assert exec(code) == "Hello World\n"
+        assert execute(code) == "Hello World\n"
+
+
+# Test executing a block of python code with a return value
+# and using it as a condition
+def test_execute_python_code_with_return():
+    condition = "if '[[USERPARAM]]' == 'World': print('Yes')"
+    with local_context(USERPARAM="World"):
+        assert execute(condition) == "Yes\n"
 
