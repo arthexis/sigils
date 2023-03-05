@@ -7,8 +7,9 @@ assignees: ''
 
 ---
 
-Would you kindly add the following text to the README and implement the required code changes?
+### Requested change: 
+Add the following text to the README and implement the required code changes?
+> [[REQUEST]]
 
-[[REQUEST]]
-
-This feature has been marked for the next release. Thanks.
+### Reason for request:
+[[]REASON]
