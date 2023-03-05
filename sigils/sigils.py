@@ -1,4 +1,4 @@
-from .transforms import resolve
+from .transforms import splice
 from .contexts import local_context
 
 
@@ -14,7 +14,7 @@ class Sigil(str):
 
     def __str__(self):
         """Resolve the sigil."""
-        return resolve(self.original, **self.kwargs)
+        return splice(self.original, **self.kwargs)
     
     def __repr__(self):
         """Return a representation of the sigil."""
@@ -23,7 +23,7 @@ class Sigil(str):
     def __call__(self, *args, **kwargs):
         """Send all args and kwargs to context, then resolve."""
         with local_context(*args, **kwargs):
-            return resolve(self.original, **self.kwargs)
+            return splice(self.original, **self.kwargs)
 
 
 __all__ = ["Sigil"]

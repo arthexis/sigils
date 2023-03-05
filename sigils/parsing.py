@@ -32,10 +32,10 @@ _parser = lark.Lark(GRAMMAR)
 parse = _parser.parse
 
 
-def extract(
+def pull(
         text: Union[str, TextIO],
-        left: str = "[",
-        right: str = "]"
+        left: str = "[[",
+        right: str = "]]"
 ) -> Iterator[str]:
     """Generator that extracts top-level sigils from text.
 
@@ -56,20 +56,26 @@ def extract(
     >>> list(extract("Connect to [ENV.HOST as USER"))
     []
     """
-
+    assert len(left) == 2 and len(right) == 2, "Delimiters must be 2 characters long."
     buffer = []
     depth = 0
-    if isinstance(text, str): text = io.StringIO(text)
+    fleft, fright = left[0], right[0]
+    if isinstance(text, str): 
+        text = io.StringIO(text) 
     while char := text.read(1):
-        if char == left: depth += 1
+        if char == fleft: 
+            # Check the next char to confirm it's a sigil
+            if text.read(1) == left[1]:
+                depth += 1
         if depth > 0:
             buffer.append(char)
-            if char == right:
-                depth -= 1
+            if char == fright:
+                if text.read(1) == right[1]:
+                    depth -= 1
                 if depth == 0:
                     token = ''.join(buffer)
                     if token.count("'") % 2 == 0 and token.count('"') % 2 == 0:
-                        yield token
+                        yield left[1] + token + right[1]
                     buffer.clear()
 
 
@@ -128,14 +134,14 @@ class SigilContextTransformer(lark.Transformer):
             return
         if manager := _try_manager(target):
             # We don't want to find managers after the first node
-            logger.debug("Found 'objects' attribute, treat as Django Model.")
+            # logger.debug("Found 'objects' attribute, treat as Django Model.")
             if param:
                 # logger.debug(f"Search by pk={param}")
                 if instance := manager.get(pk=param):
-                    logger.debug(f"Found instance with pk={param}.")
+                    # logger.debug(f"Found instance with pk={param}.")
                     target = instance
                 elif instance := manager.get_by_natural_key(param):
-                    logger.debug(f"Found instance with natural key: {param}.")
+                    # logger.debug(f"Found instance with natural key: {param}.")
                     target = instance
             else:
                 try:
@@ -170,8 +176,7 @@ class SigilContextTransformer(lark.Transformer):
                 # We don't casefold filters (they are not Model fields)
                 # logger.debug(f"Filter {name} found in context.")
                 target = _try_call(_filter, target, param)
-            else:
-                logger.debug("Unable to consume full sigil {name} for {target}.") 
+            # logger.debug("Unable to consume full sigil {name} for {target}.") 
         if isinstance(target, bytes):
             return target.decode()
         elif isinstance(target, (list, tuple)):
@@ -195,4 +200,4 @@ class SigilContextTransformer(lark.Transformer):
     null = lambda self, _: ""
 
 
-__all__ = ["extract", "SigilContextTransformer"]
+__all__ = ["pull", "SigilContextTransformer"]

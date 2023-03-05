@@ -1,4 +1,6 @@
+import io
 import ast
+import contextlib
 from enum import Enum
 from typing import Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
 
@@ -16,7 +18,7 @@ class OnError(str, Enum):
     DEFAULT = "default"
 
 
-def resolve(
+def splice(
         text: Union[str, TextIO],
         serializer: Callable[[Any], str] = str,
         on_error: str = OnError.DEFAULT,
@@ -49,7 +51,7 @@ def resolve(
 
     if not isinstance(text, str):
         text = text.read()
-    sigils = set(parsing.extract(text))
+    sigils = set(parsing.pull(text))
 
     if not sigils:
         # logger.debug(f"No more sigils in '{text}'.")
@@ -65,7 +67,7 @@ def resolve(
                 value = contexts._local.lru[sigil]
                 # logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
             else:
-                tree = parsing.parse(sigil)
+                tree = parsing.parse(sigil[1:-1])
                 transformer = parsing.SigilContextTransformer(contexts._local.ctx)
                 value = transformer.transform(tree).children[0]
                 # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
@@ -74,7 +76,7 @@ def resolve(
             if value is not None:
                 fragment = serializer(value)
                 if recursion_limit > 0:
-                    fragment = resolve(
+                    fragment = splice(
                         fragment,
                         serializer,
                         on_error,
@@ -95,7 +97,7 @@ def resolve(
     return text
 
 
-def replace(
+def vanish(
         text: str,
         pattern: Union[Text, Iterator],
 ) -> Tuple[str, Tuple[str]]:
@@ -113,15 +115,16 @@ def replace(
     ('select * from users where username = ?', ['[USER]'])
     """
 
-    sigils = list(parsing.extract(text))
+    sigils = list(parsing.pull(text))
     _iter = (iter(pattern) if isinstance(pattern, Iterator) 
              else iter(pattern * len(sigils)))
     for sigil in set(sigils):
         text = (text.replace(sigil, str(next(_iter)) or sigil))
     return text, tuple(sigils)
 
+__exec = exec
 
-def execute(
+def exec(
         code: str,
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
@@ -131,19 +134,26 @@ def execute(
         _globals: Optional[dict[str, Any]] = None,
 ) -> Union[str, None]:
     """Execute a Python code block after resolving any sigils appearing in 
-    it's strings. Sigils appearing outside of strings are not resolved.
+    it's strings. Sigils appearing outside of strings are not resolved
+    to avoid unintended side effects. If the executed code block prints to stdout,
+    it's output is returned. If the code prints to stderr, a SigilError is raised.
     """
     tree = ast.parse(code)
     for node in ast.walk(tree):
         if isinstance(node, ast.Str):
-            node.s = resolve(
+            node.s = splice(
                 node.s, 
                 on_error=on_error, 
                 default=default, 
                 recursion_limit=recursion_limit, 
                 cache=cache
             )   
-    exec(compile(tree, "<string>", "exec"), _globals, _locals)
+    with contextlib.redirect_stdout(io.StringIO()) as f:
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            __exec(compile(tree, "<string>", "exec"), _globals, _locals)
+            if err.getvalue():
+                raise errors.SigilError(err.getvalue())
+    return f.getvalue()
 
 
-__all__ = ["resolve", "replace", "execute", "OnError"]
+__all__ = ["splice", "vanish", "exec", "OnError"]

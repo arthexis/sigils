@@ -2,6 +2,8 @@ import sys
 import logging
 from .sigils import Sigil, local_context
 
+# TODO: Use a smallish library for command line parsing
+
 def main():
     global DEBUG
     if len(sys.argv) < 2:
