@@ -45,37 +45,36 @@ def pull(
     :return: An iterable of sigil strings.
 
     >>> # Extract simple sigils from text
-    >>> list(extract("Connect to [ENV.HOST] as [USER]"))
+    >>> list(pull("Connect to [ENV.HOST] as [USER]"))
     ['[ENV.HOST]', '[USER]']
 
     >>> # Nested sigils are allowed, only top level is extracted
-    >>> list(extract("Environ [ENV=[SRC]]"))
+    >>> list(pull("Environ [ENV=[SRC]]"))
     ['[ENV=[SRC]]']
 
     >>> # Malformed sigils are not extracted (no errors raised).
-    >>> list(extract("Connect to [ENV.HOST as USER"))
+    >>> list(pull("Connect to [ENV.HOST as USER"))
     []
     """
     assert len(left) == 2 and len(right) == 2, "Delimiters must be 2 characters long."
     buffer = []
     depth = 0
-    fleft, fright = left[0], right[0]
+    _left, _right = left[0], right[0]
     if isinstance(text, str): 
         text = io.StringIO(text) 
     while char := text.read(1):
-        if char == fleft: 
-            # Check the next char to confirm it's a sigil
+        if char == _left:
             if text.read(1) == left[1]:
                 depth += 1
         if depth > 0:
             buffer.append(char)
-            if char == fright:
+            if char == _right:
                 if text.read(1) == right[1]:
                     depth -= 1
                 if depth == 0:
                     token = ''.join(buffer)
                     if token.count("'") % 2 == 0 and token.count('"') % 2 == 0:
-                        yield left[1] + token + right[1]
+                        yield _left + token + _right
                     buffer.clear()
 
 

@@ -47,20 +47,23 @@ A typical sigil has one of the following forms in text:
     [[MODEL='natural-key'.FIELD]]
     [[MODEL="natural-key".FIELD]]
     [[ENV=TIER.HOST]]
-    [[MODEL.USER=[[USERNAME]].STATUS]]
+    [[MODEL.USER=[USERNAME].STATUS]]
 
 Each sigil is a linked list of **nodes** separated by a dot.
 Nodes can be **natural** or **parametrized**. 
 Natural means, use the natural context to figure out the value. 
 If parametrized, they can take an **argument** using the equals sign. 
+
 The argument can be a number, a quoted string, or another sigil.
+When thye argument is a sigil, only use one brace pair.
 
 .. code-block:: text
 
-    [[NODE1='ARG1'.NODE2=[[ARG2]].NODE3=10.ETC]]
+    [[NODE1='ARG1'.NODE2=[ARG2].NODE3=10.ETC]]
 
 Nesting can be done to any depth. If quotes are avoided around the inner sigils, 
-data types will be preserved. If quotes are used, the result is always a string.
+data types will be preserved until the final interpolation.
+If quotes are used, the result is always a string.
 
 
 Whitespace

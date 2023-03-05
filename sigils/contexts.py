@@ -131,6 +131,7 @@ class ThreadLocal(threading.local):
             "ESC": lambda x: x.replace("\\", "\\\\").replace('"', '\\"'),
             "UNIQ": lambda x: list(set(x)),
             "ZIP": lambda x, y: list(zip(x, y)),
+            "SIGIL": lambda x: f"[[{x}]]",
             "WORD": lambda x, y: x.split()[y],
         })
         self.lru = LRU(128)

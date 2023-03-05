@@ -3,10 +3,17 @@ import pytest
 
 from ..parsing import *  # Module under test
 
+
+def test_extract_slightly_nested():
+    # Simple example
+    sigil = "[[APP=[SYS.ENV.APP_NAME].MODULE.NAME]]"
+    text = f"-- {sigil} --"
+    assert set(pull(text)) == {sigil}
+
 # TODO: Fix nested sigils
 def test_extract_single_deep_nested():
     # Very exagerated example
-    sigil = "[APP=[ENV=[REQUEST].USER]].OR=[ENV=[DEFAULT].USER].MODULE.NAME]]]"
+    sigil = "[[APP=[ENV=[REQUEST].USER]].OR=[ENV=[DEFAULT].USER].MODULE.NAME]]"
     text = f"-- {sigil} --"
     assert set(pull(text)) == {sigil}
 

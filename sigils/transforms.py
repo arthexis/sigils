@@ -23,7 +23,7 @@ def splice(
         serializer: Callable[[Any], str] = str,
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
-        recursion_limit: int = 1,
+        recursion_limit: int = 6,
         cache: bool = True,
 ) -> str:
     """
@@ -128,7 +128,7 @@ def exec(
         code: str,
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
-        recursion_limit: int = 1,
+        recursion_limit: int = 6,
         cache: bool = True,
         _locals: Optional[dict[str, Any]] = None,
         _globals: Optional[dict[str, Any]] = None,
