@@ -105,28 +105,6 @@ def test_replace_duplicated():
     assert sigils == ("[[U]]", "[[U]]", "[[ORG]]")
     assert text == "User: X, Manager: X, Company: X"
 
-
-def test_cache_value_is_used():
-    with local_context(USER="arthexis"):
-        splice("[[USER]]")
-        with local_context(USER="joe"):
-            assert splice("[[USER]]") == "arthexis"
-
-
-def test_cache_value_is_not_used():
-    with local_context(USER="arthexis"):
-        splice("[[USER]]")
-        with local_context(USER="joe"):
-            assert splice("[[USER]]", cache=False) == "joe"
-
-
-def test_cache_value_is_not_saved():
-    with local_context(USER="arthexis"):
-        splice("[[USER]]", cache=False)
-        with local_context(USER="joe"):
-            assert splice("[[USER]]") == "joe"
-
-
 def test_resolve_simple_whitespace():
     with local_context({"ENV": "local"}):
         assert splice("[[ ENV ]]") == "local"

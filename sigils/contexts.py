@@ -12,8 +12,6 @@ import contextlib
 import threading
 from typing import Generator, Optional, Any
 
-from lru import LRU
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -178,7 +176,6 @@ class ThreadLocal(threading.local):
             "SIG": lambda x: f"[[{x}]]",
             "WORD": lambda x, y: x.split()[y],
         })
-        self.lru = LRU(128)
         # Add default context sources and thread local variables here
 
 
@@ -204,7 +201,6 @@ def local_context(*args, **kwargs) -> Generator[collections.ChainMap, None, None
             _local.ctx[key] = val
     yield _local.ctx
     _local.ctx = _local.ctx.parents
-    _local.lru.clear()
 
 
 def global_context(key: Optional[str] = None, value: Any = None) -> Any:

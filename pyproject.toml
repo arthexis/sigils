@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
@@ -30,7 +30,6 @@ classifiers = [
 dependencies = [
     'lark',
     'lark-parser',
-    'lru-dict'
 ]
 
 [project.urls]

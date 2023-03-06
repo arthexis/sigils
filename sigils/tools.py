@@ -27,7 +27,6 @@ def splice(
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
         max_recursion: int = 6,
-        cache: bool = True,
 ) -> str:
     """
     Resolve all sigils found in text, using the local context.
@@ -44,7 +43,6 @@ def splice(
     :param max_recursion: If greater than zero, and the output of a resolved sigil
         contains other sigils, resolve them as well until no sigils remain or
         until max_recursion is reached (default is 6).
-    :param cache: Use an LRU cache to store resolved sigils (default True).
 
     >>> # Resolving sigils using context:
     >>> with context(ENV={"HOST": "localhost"}, USER="arthexis"}):
@@ -64,7 +62,7 @@ def splice(
             results = pool.starmap(
                 splice,
                 [
-                    (sigil, text, serializer, on_error, default, max_recursion, cache)
+                    (sigil, text, serializer, on_error, default, max_recursion)
                     for sigil in sigils
                 ],
             )
@@ -73,16 +71,10 @@ def splice(
         try:
             # By using a lark transformer, we parse and resolve
             # each sigil in isolation and in a single pass
-            if cache and sigil in contexts._local.lru:
-                value = contexts._local.lru[sigil]
-                # logger.debug("Sigil '%s' value from cache '%s'.", sigil, value)
-            else:
-                tree = parser.parse(sigil[1:-1])
-                transformer = parser.SigilContextTransformer(contexts._local.ctx)
-                value = transformer.transform(tree).children[0]
-                # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
-                if cache:
-                    contexts._local.lru[sigil] = value
+            tree = parser.parse(sigil[1:-1])
+            transformer = parser.SigilContextTransformer(contexts._local.ctx)
+            value = transformer.transform(tree).children[0]
+            # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
             if value is not None:
                 fragment = serializer(value)
                 if max_recursion > 0:
@@ -138,7 +130,6 @@ def execute(
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
         recursion_limit: int = 6,
-        cache: bool = True,
         unsafe: bool = False,	
         _locals: Optional[dict[str, Any]] = None,
         _globals: Optional[dict[str, Any]] = None,
@@ -157,12 +148,11 @@ def execute(
                     on_error=on_error, 
                     default=default, 
                     max_recursion=recursion_limit, 
-                    cache=cache
                 )   
         _code = compile(tree, "<string>", "exec")
     else:
         _code = splice(code, on_error=on_error, default=default, 
-                       max_recursion=recursion_limit, cache=cache)
+                       max_recursion=recursion_limit)
     with contextlib.redirect_stdout(io.StringIO()) as f:
         with contextlib.redirect_stderr(io.StringIO()) as err:
             # If it looks like an expression, use eval
