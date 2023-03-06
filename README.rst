@@ -451,9 +451,8 @@ to use, use the "Bug Report" template.
 Project Dependencies
 --------------------
 
-.. _lark: https://github.com/lark-parser/lark
-.. _lru-dict: https://github.com/amitdev/lru-dict
-.. _pytest: https://docs.pytest.org/en/7.2.x/
+.. _lark lark: https://github.com/lark-parser/lark
+.. _pytest pytest: https://docs.pytest.org/en/7.2.x/
 
 
 Special Thanks
