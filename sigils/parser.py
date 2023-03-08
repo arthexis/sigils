@@ -7,20 +7,21 @@ import lark
 logger = logging.getLogger(__name__)
 
 GRAMMAR = r"""
-    start    : sigil
-    sigil    : "[" node ("." node)* "]"
-    node     : CNAME ["=" arg]
-    arg      : sigil
-             | "'" /[^']+/ "'"
-             | "\"" /[^"]+/ "\""
-             | integer
-             | CNAME
-             | "True"
-             | "False"
-             | "None"
-             | null
-    null     : "NULL"
-    integer  : INT
+    start       : sigil
+    sigil       : "[" node ("." node)* "]"
+    node        : CNAME ["=" arg]
+                | arg
+    arg         : sigil
+                | "'" /[^']+/ "'"
+                | "\"" /[^"]+/ "\""
+                | integer
+                | CNAME
+                | "True"
+                | "False"
+                | "None"
+                | null
+    null        : "NULL"
+    integer     : INT
 
     %import common.CNAME
     %import common.INT
@@ -40,26 +41,26 @@ def spool(
     """Generator that extracts top-level sigils from text.
 
     :param text: The text to extract the sigils from.
-    :param left: Left delimiter, defaults to "[".
-    :param right: Right delimiter, defaults to "]".
+    :param left: Left delimiter, defaults to "[[".
+    :param right: Right delimiter, defaults to "]]".
     :return: An iterable of sigil strings.
 
     >>> # Extract simple sigils from text
-    >>> list(pull("Connect to [ENV.HOST] as [USER]"))
-    ['[ENV.HOST]', '[USER]']
+    >>> list(spool("Connect to [[ENV.HOST]] as [[USER]]"))
+    ['[[ENV.HOST]]', '[[USER]]']
 
     >>> # Nested sigils are allowed, only top level is extracted
-    >>> list(pull("Environ [ENV=[SRC]]"))
-    ['[ENV=[SRC]]']
+    >>> list(spool("Environ [[SYS.ENV=[SRC]]"))
+    ['[[SYS.ENV=[SRC]]']
 
     >>> # Malformed sigils are not extracted (no errors raised).
-    >>> list(pull("Connect to [ENV.HOST as USER"))
+    >>> list(spool("Connect to [[ENV.HOST as USER"))
     []
     """
     assert len(left) == 2 and len(right) == 2, "Delimiters must be 2 characters long."
     buffer = []
     depth = 0
-    _left, _right = left[0], right[0]
+    _left, _right = left[0], right[0]  
     if isinstance(text, str): 
         text = io.StringIO(text) 
     while char := text.read(1):
@@ -67,10 +68,7 @@ def spool(
             if text.read(1) == left[1]:
                 depth += 1
         if depth > 0:
-            if char == '$':
-                buffer.append("SYS.")
-            else:
-                buffer.append(char)
+            buffer.append(char)
             if char == _right:
                 if text.read(1) == right[1]:
                     depth -= 1

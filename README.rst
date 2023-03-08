@@ -15,7 +15,7 @@ A sigil can also hold metadata in it's filter structure, such as the type of val
 name of the field and model, or remote resource where the data should be fetched from, 
 what functions should be applied to the found value, etc. 
 
-Sigils includes all you need to resolve, execute, extract and replace sigils.
+Sigils includes all you need to manipulate text containing sigils.
 It works with Django OOTB, but it can be used in any Python project.
 Sigils is thread-safe and fast. It is also very easy to extend.
 
@@ -230,15 +230,6 @@ Currently these are available in all contexts:
 * ``CWD``: as above
 * ``TMP``: return the path to the temporary directory
 
-The special root `$` can be used instead of `SYS.`, for example:
-
-.. code-block:: python
-
-    from sigils import resolve
-
-    assert resolve("[[$ENV.PATH]]") == os.environ["PATH"]
-    assert resolve("[[$ARGS.0]]") == sys.argv[0]
-
 
 Special and Reserved Characters
 -------------------------------
@@ -251,7 +242,6 @@ except as specified in this document:
 * ``'`` and ``"``: string delimiters
 * ``=``: argument or natural key separator
 * ``\``: escape character
-* ``$``: reserved for SYS. shorthand
 * ``(`` and ``)``: reserved for future use
 
 Quotes can be used interchangeably, but they must be balanced.
@@ -289,7 +279,7 @@ actual values from the context. Returns the interpolated string.
 
 .. code-block:: python
 
-    from sigils import resolve, context
+    from sigils import splice, context
 
     with context(
         USERNAME="arthexis",
@@ -311,13 +301,32 @@ Values can be anything, a string, a number, a list, a dict, or an ORM instance.
         MODEL: Model,                  # [[MODEL.OWNER]]
         UPPER: lambda x: x.upper(),    # [[UPPER='text']]
     ):
-        assert resolve("[[MODEL.OWNER.UPPER]]") == "ARTHEXIS"
+        assert splice("[[MODEL.OWNER.UPPER]]") == "ARTHEXIS"
 
-You can pass additional context to resolve directly: 
+You can pass additional context to splice directly: 
 
 .. code-block:: python
 
-    assert resolve("[[NAME.UPPER]]", context={"NAME": "arth"}) == "ARTH"
+    assert splice("[[NAME.UPPER]]", context={"NAME": "arth"}) == "ARTH"
+
+By default, the splice function will recurse into the found values,
+interpolating any sigils found in them. This can be disabled by setting
+the recursion parameter to 0. Default recursion is 6.
+
+.. code-block:: python
+
+    from sigils import splice, context
+
+    with context(
+        USERNAME="arthexis",
+        DIR="/home/[[USERNAME]]",
+        SETTING={"BASE_DIR": "[[DIR]]/webapp"},
+    ):
+        result = splice("[[USERNAME]]: [[SETTINGS.BASE_DIR]]", recursion=1)
+        assert result == "arthexis: /home/[[USERNAME]]"
+
+
+The function *resolve* is an alias for splice that never recurses.
 
 
 The *execute* function is similar to resolve, but executes the found text 
@@ -333,6 +342,8 @@ as a python block (not an expression). This is useful for interpolating code:
     ):
         result = execute("print('[[USERNAME]]')")
         assert result == "arthexis"
+        result = execute("print([[SETTING.BASE_DIR]])")
+        assert result == "/home/arth/webapp"
         
 
 Sigils will only be resolved within strings inside the code unless
@@ -343,8 +354,7 @@ the unsafe flag is set to True. For example:
     from sigils import execute, context
 
     with context(
-        USERNAME="arthexis",
-        SETTING={"BASE_DIR": "/home/arth/webapp"},
+        USERNAME="'arthexis'",    
     ):
         result = execute("print([[USERNAME]])", unsafe=True)
         assert result == "arthexis"
@@ -436,6 +446,51 @@ Then you can use something like this in your template:
 .. _simple tag: https://docs.djangoproject.com/en/2.2/howto/custom-template-tags/#simple-tags
 
 
+Command Line Interface
+----------------------
+
+The *sigils* command line tool can be used to resolve sigils in arguments
+or files, with a given context. Example usage:
+
+.. code-block:: bash
+
+    $ sigils --help
+    Usage: python -m sigils [OPTIONS] [TEXT]...
+
+    Resolve sigils found in the given text.
+
+    Options:
+        -e, --on-error [raise|remove|default|ignore]
+                                        What to do when a sigil cannot be resolved.
+                                        Default: ignore.
+        -d, --default TEXT              Default value for ignored sigils.
+        -v, --verbose                   Increase verbosity.
+        -i, --interactive               Enter interactive mode.
+        -f, --file TEXT                 Read text from given file.
+        -c, --context TEXT              Context to use for resolving sigils.
+        --help                          Show this message and exit.
+
+    $ sigils "Hello, [[USERNAME]]!" 
+    # arthexis/sigils
+
+    $ sigils -c "USERNAME=arthexis" README.md -o README2.md
+    $ cat README2.md
+    # arthexis/sigils
+
+
+Project Dependencies
+--------------------
+
+* Python 3.9+
+* `lark`_ for parsing
+* `click`_ for the command line interface
+* `pytest`_ for testing
+
+.. _lark: https://github.com/lark-parser/lark
+.. _pytest: https://docs.pytest.org/en/7.2.x/
+.. _click: https://click.palletsprojects.com/en/7.x/
+
+
 Feature Requests & Bug Reports
 ------------------------------
 
@@ -448,14 +503,7 @@ Issues must use one of the approved templates. If you don't know which one
 to use, use the "Bug Report" template. 
 
 
-Project Dependencies
---------------------
-
-.. _lark lark: https://github.com/lark-parser/lark
-.. _pytest pytest: https://docs.pytest.org/en/7.2.x/
-
-
 Special Thanks
 --------------
 
-Katia Larissa Jasso García, for the name "sigils".
+My wife, Katia Larissa Jasso García, for the name "sigils".

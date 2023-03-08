@@ -45,11 +45,3 @@ def test_parse_sub_sigil_not_closed():
     sigil = "[[ENV.HELLO='World]]"
     text = f"-- {sigil} --"
     assert set(spool(text)) == set()
-
-# Thest that $ can be used in place of SYS.
-def test_parse_sub_sigil_sys():
-    sigil = "[[$ENV.HOST]]"
-    text = f"{sigil.replace('$', 'SYS.')}"
-    assert set(spool(sigil)) == {text}
-
-

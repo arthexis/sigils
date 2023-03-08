@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 from ..tools import *  # Module under test
-from ..errors import SigilError
+from ..errors import SigilError, OnError
 from ..sigils import Sigil
 from ..contexts import local_context, global_context
 
@@ -117,7 +117,7 @@ def test_resolve_dotted_whitespace():
 
 def test_resolve_recursive_one_level():
     with local_context(Y="[[X]]", X=10):
-        assert splice("[[Y]]", max_recursion=1) == "10"
+        assert splice("[[Y]]", recursion=1) == "10"
 
 
 def test_sigil_helper_class():

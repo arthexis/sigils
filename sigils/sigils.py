@@ -1,29 +1,41 @@
-from .tools import splice
+from .tools import splice, execute, spool, vanish
 from .contexts import local_context
 
 
 class Sigil(str):
-    """Encapsulate a string that can contain sigils.
-    When an instance of this class has its __str__ method called,
-    the text gets passed through resolve automatically.
+    """Encapsulates a string or stream that may contain sigils.
     """
 
-    def __init__(self, original: str, **kwargs):
+    def __init__(self, original: str, **context):
         self.original = original
-        self.kwargs = kwargs
+        self.context = context
 
     def __str__(self):
-        """Resolve the sigil."""
-        return splice(self.original, **self.kwargs)
+        """Resolve the sigil with splice and return the resulting text."""
+        return splice(self.original, **self.context)
     
     def __repr__(self):
-        """Return a representation of the sigil."""
+        """Return a original representation of the text with sigils."""
         return self.original
 
     def __call__(self, *args, **kwargs):
         """Send all args and kwargs to context, then resolve."""
         with local_context(*args, **kwargs):
-            return splice(self.original, **self.kwargs)
+            return splice(self.original, **self.context)
+        
+    def __iter__(self):
+        """Iterate over the sigils in the text."""
+        return iter(spool(self.original))
+    
+    @property
+    def sigils(self):
+        """Return a list of sigils in the text."""
+        return list(self)
+    
+    def clean(self, pattern: str):
+        """Replace all sigils in the text with another pattern."""
+        return vanish(self.original, pattern)
+
 
 
 __all__ = ["Sigil"]

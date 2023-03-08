@@ -2,7 +2,7 @@ import pytest
 from dataclasses import dataclass
 
 from ..tools import *  # Module under test
-from ..errors import SigilError
+from ..errors import SigilError, OnError
 from ..contexts import local_context
 
 DATABASE = []

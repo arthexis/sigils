@@ -5,3 +5,4 @@ sdist
 build
 twine
 python-dotenv
+click

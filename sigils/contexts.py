@@ -33,6 +33,9 @@ class System:
     class _Env:
         def __getitem__(self, item):
             return os.getenv(item.upper())
+        
+        def __str__(self):
+            return str(','.join(os.environ.keys()))
 
     _env = _Env()
 

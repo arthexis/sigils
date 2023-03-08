@@ -1,41 +1,34 @@
 import io
 import ast
+import functools
 import contextlib
 import multiprocessing as mp
-from enum import Enum
 from typing import Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
 
-from . import errors, contexts, parser
+from . import contexts
+from .parser import spool, parse, SigilContextTransformer
+from .errors import SigilError, OnError
 
-spool = parser.spool
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-# Rewrite the constants as an enum
-class OnError(str, Enum):
-    CONTINUE = "continue"
-    RAISE = "raise"
-    REMOVE = "remove"
-    DEFAULT = "default"
-
-
 def splice(
         text: Union[str, TextIO],
-        serializer: Callable[[Any], str] = str,
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
-        max_recursion: int = 6,
+        recursion: int = 6,
+        serializer: Callable[[Any], str] = str,
 ) -> str:
     """
-    Resolve all sigils found in text, using the local context.
-    If the text contains no sigils, it will be returned unchanged.
+    Resolve all sigils found in text, using the local context, and return the
+    resulting text. If the text contains no sigils, it's returned unchanged.
 
     :param text: The text containing sigils.
     :param on_error: What to do if a sigil cannot be resolved:
         OnError.DEFAULT: Replace the sigil with the default value (the default).
-        OnError.CONTINUE: Ignore the error and leave the text unchanged.
+        OnError.IGNORE: Ignore the error and leave the sigil in the text output.
         OnError.RAISE: Raise a SigilError detailing the problem.
         OnError.REMOVE: Remove the sigil from the text output.
     :param serializer: Function used to serialize the sigil value, defaults to str.
@@ -56,39 +49,34 @@ def splice(
         return text  # Not an error, just do nothing
     results = []
 
-    # TODO: Run this in parallel if there are many sigils
     if len(sigils) > 1:
         with mp.Pool() as pool:
-            results = pool.starmap(
-                splice,
-                [
-                    (sigil, text, serializer, on_error, default, max_recursion)
-                    for sigil in sigils
-                ],
-            )
+            results = pool.starmap(splice, [
+                (sigil, on_error, default, recursion)
+                for sigil in sigils
+            ])
     else:
         sigil = sigils.pop()
         try:
             # By using a lark transformer, we parse and resolve
             # each sigil in isolation and in a single pass
-            tree = parser.parse(sigil[1:-1])
-            transformer = parser.SigilContextTransformer(contexts._local.ctx)
+            tree = parse(sigil[1:-1])
+            transformer = SigilContextTransformer(contexts._local.ctx)
             value = transformer.transform(tree).children[0]
             # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
             if value is not None:
                 fragment = serializer(value)
-                if max_recursion > 0:
+                if recursion > 0:
                     fragment = splice(
                         fragment,
-                        serializer,
                         on_error,
                         default,
-                        max_recursion=(max_recursion - 1)
+                        recursion=(recursion - 1)
                     )
                 text = text.replace(sigil, fragment)
         except Exception as ex:
             if on_error == OnError.RAISE:
-                raise errors.SigilError(sigil) from ex
+                raise SigilError(sigil) from ex
             elif on_error == OnError.REMOVE:
                 text = text.replace(sigil, "")
             elif on_error == OnError.DEFAULT:
@@ -98,6 +86,10 @@ def splice(
         for sigil, result in zip(sigils, results):
             text = text.replace(sigil, result)
     return text
+
+
+# Resolve is a version of splice that defaults to recursion = 0
+resolve = functools.partial(splice, recursion=0)
 
 
 def vanish(
@@ -130,38 +122,26 @@ def execute(
         on_error: str = OnError.DEFAULT,
         default: Optional[str] = "",
         recursion_limit: int = 6,
-        unsafe: bool = False,	
         _locals: Optional[dict[str, Any]] = None,
         _globals: Optional[dict[str, Any]] = None,
 ) -> Union[str, None]:
-    """Execute a Python code block after resolving any sigils appearing in 
-    it's strings. Sigils appearing outside of strings are not resolved
-    to avoid unintended side effects. If the executed code block prints to stdout,
-    it's output is returned. If the code prints to stderr, a SigilError is raised.
+    """Execute a Python code block after resolving any sigils appearing in it.
+    If the executed code block prints to stdout, it's output is returned. 
+    If the code prints to stderr, a SigilError is raised.
+    If the code block looks like an expression, it's value is returned.
+    If the code block looks like a statement, None is returned.
+    If the code block contains no sigils, it's not executed and None is returned.
     """
-    tree = ast.parse(code)
-    if not unsafe:
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Str):
-                node.s = splice(
-                    node.s, 
-                    on_error=on_error, 
-                    default=default, 
-                    max_recursion=recursion_limit, 
-                )   
-        _code = compile(tree, "<string>", "exec")
-    else:
-        _code = splice(code, on_error=on_error, default=default, 
-                       max_recursion=recursion_limit)
+    if not set(spool(code)):
+        return None
+    _code = splice(code, on_error=on_error, default=default, 
+                    recursion=recursion_limit)
     with contextlib.redirect_stdout(io.StringIO()) as f:
         with contextlib.redirect_stderr(io.StringIO()) as err:
-            # If it looks like an expression, use eval
-            if isinstance(tree.body[0], ast.Expr):
-                return eval(_code, _globals, _locals)
             exec(_code, _globals, _locals)
             if err.getvalue():
-                raise errors.SigilError(err.getvalue())
+                raise SigilError(err.getvalue())
     return f.getvalue()
 
 
-__all__ = ["spool", "splice", "vanish", "execute", "OnError"]
+__all__ = ["spool", "splice", "execute", "vanish", "resolve", ]
