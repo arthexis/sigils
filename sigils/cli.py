@@ -2,18 +2,10 @@ import logging
 import pathlib
 import click    
 
-from .sigils import splice, execute, local_context
+from .tools import splice, execute
+from .contexts import context as local_context
 
 logging.basicConfig(level=logging.WARNING)
-
-
-# Function that recursively changes the keys of a dictionary
-# to uppercase. This is used to convert the context dictionary
-def _upper_keys(d):
-    if isinstance(d, dict):
-        return {k.upper(): _upper_keys(v) for k, v in d.items()}
-    else:
-        return d
 
 
 @click.command()
@@ -27,23 +19,15 @@ def _upper_keys(d):
 @click.option("--interactive", "-i", is_flag=True, help="Enter interactive mode.")
 @click.option("--file", "-f", help="Read text from given file.")
 @click.option("--exec", "-x", is_flag=True, help="Execute the text after resolving sigils.")
-@click.option("--context", "-c", help="Context to use for resolving sigils.")
+@click.option("--context", "-c", multiple=True,
+        help="Context to use for resolving sigils."
+            "Can be a file or a key=value pair. Multiple values are allowed.")
 def main(text, on_error, verbose, default, interactive, file, exec, context):
     """Resolve sigils found in the given text."""
-    _context = {}
-
     if verbose == 1:
         logging.basicConfig(level=logging.INFO)
     elif verbose > 1:
         logging.basicConfig(level=logging.DEBUG)
-
-    if context:
-        # If the context looks like a TOML file, load it
-        if context.endswith(".toml"):
-            import tomllib
-            with open(context, 'r') as f:
-                toml_data = tomllib.loads(f.read())
-                _context.update(_upper_keys(toml_data))
 
     if interactive:
         import code
@@ -61,7 +45,8 @@ def main(text, on_error, verbose, default, interactive, file, exec, context):
             text = f.read()
     else:
         text = " ".join(text)
-    with local_context(**_context):
+    print(f"Context: {context}")
+    with local_context(*context):
         if not exec:
             result = splice(text, on_error=on_error, default=default)
         else:

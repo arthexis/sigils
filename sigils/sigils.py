@@ -1,5 +1,5 @@
-from .tools import splice, execute, spool, vanish
-from .contexts import local_context
+from .tools import splice, spool, vanish, unvanish
+from .contexts import context
 
 
 class Sigil(str):
@@ -20,7 +20,7 @@ class Sigil(str):
 
     def __call__(self, *args, **kwargs):
         """Send all args and kwargs to context, then resolve."""
-        with local_context(*args, **kwargs):
+        with context(*args, **kwargs):
             return splice(self.original, **self.context)
         
     def __iter__(self):
@@ -35,6 +35,10 @@ class Sigil(str):
     def clean(self, pattern: str):
         """Replace all sigils in the text with another pattern."""
         return vanish(self.original, pattern)
+    
+    def dirty(self, sigils: list, pattern: str):
+        """De-replace all patterns in the text with sigils."""
+        return unvanish(self.original, sigils, pattern)  # type: ignore
 
 
 

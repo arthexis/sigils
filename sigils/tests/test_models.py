@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from ..tools import *  # Module under test
 from ..errors import SigilError, OnError
-from ..contexts import local_context
+from ..contexts import context
 
 DATABASE = []
 
@@ -48,32 +48,32 @@ def test_model_has_objects_attribute():
 
 def test_model_context_class():
     UserModel(pk=1, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         assert splice("[[USR]]", serializer=lambda x: x.__name__) == "UserModel"
 
 
 def test_model_context_pk_attribute():
     UserModel(pk=1, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         assert splice("[[USR=1.NAME]]") == "arthexis"
 
 
 def test_model_context_pk():
     UserModel(pk=2, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         assert splice("[[USR.NAME='arthexis'.PK]]") == "1"
 
 
 def test_model_context_wrong_attribute():
     UserModel(pk=3, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         with pytest.raises(SigilError):
             assert splice("[[USR='admin'.NAME]]", on_error=OnError.RAISE)
 
 
 def test_model_context_get_by_natural_key():
     UserModel(pk=3, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         assert splice("[[USR='arthexis'.ALIAS]]") == 'admin'
 
 
@@ -81,6 +81,6 @@ def test_model_context_get_by_natural_key():
 def test_model_json_serialization():
     import json
     UserModel(pk=3, name="arthexis", alias="admin").save()
-    with local_context(USR=UserModel):
+    with context(USR=UserModel):
         assert json.loads(splice("[[USR='arthexis'.ALIAS]]", serializer=json.dumps)) == 'admin'
 

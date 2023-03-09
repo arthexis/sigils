@@ -108,7 +108,7 @@ class System:
 class ThreadLocal(threading.local):
     def __init__(self):
         # These will be the default filters and objects
-        self.ctx = collections.ChainMap({
+        self.context = collections.ChainMap({
             "SYS": System(),
             "NUM": lambda x: float(x) if "." in x else int(x),
             "UPPER": lambda x: str(x).upper(),
@@ -182,32 +182,79 @@ class ThreadLocal(threading.local):
         # Add default context sources and thread local variables here
 
 
-_local = ThreadLocal()
+_threadlocal = ThreadLocal()
+
+
+# Function that recursively changes the keys of a dictionary
+# to uppercase. This is used to make the context dictionary uniform.
+def _upper_keys(d):
+    if isinstance(d, dict):
+        return {k.upper(): _upper_keys(v) for k, v in d.items()}
+    else:
+        return d
+
 
 
 @contextlib.contextmanager
-def local_context(*args, **kwargs) -> Generator[collections.ChainMap, None, None]:
-    """Update the local context used for resolving sigils temporarily.
+def context(*args, **kwargs) -> Generator[collections.ChainMap, None, None]:
+    """Context manager that updates the local context used by sigils.
 
     :param args: A tuple of context sources.
-    :param kwargs: A mapping of context selectors to Resolvers.
+    :param kwargs: A mapping of context keys to values or functions.
 
     >>> # Add to context using kwargs
     >>> with context(TEXT="hello world") as ctx:
     >>>     assert ctx["TEXT"] == "hello world"
     """
-    global _local
+    global _threadlocal
+    _threadlocal.context = _threadlocal.context.new_child(kwargs)
 
-    _local.ctx = _local.ctx.new_child(kwargs)
     for arg in args:
-        for key, val in arg.items():
-            _local.ctx[key] = val
-    yield _local.ctx
-    _local.ctx = _local.ctx.parents
+        if isinstance(arg, dict):
+            _threadlocal.context = _threadlocal.context.new_child(arg)
+        elif callable(arg):
+            _threadlocal.context = _threadlocal.context.new_child(arg())
+        elif isinstance(arg, str):
+            if "=" in arg:
+                key, value = arg.split("=", 1)
+                _threadlocal.context[str(key).upper()] = value  # type: ignore
+            else:
+                file_data = {}
+                # Convert arg to an absolute path
+                arg = os.path.abspath(arg)
+                if arg.endswith(".toml"):
+                    import tomllib
+                    with open(arg, 'r') as f:
+                        file_data = _upper_keys(tomllib.loads(f.read()))
+                elif arg.endswith(".json"):
+                    import json
+                    with open(arg, 'r') as f:
+                        file_data = _upper_keys(json.loads(f.read()))
+                elif arg.endswith(".yaml") or arg.endswith(".yml"):
+                    import yaml
+                    with open(arg, 'r') as f:
+                        file_data = _upper_keys(yaml.safe_load(f.read()))
+                elif arg.endswith(".ini"):
+                    import configparser
+                    config = configparser.ConfigParser()
+                    config.read(arg)
+                    # Loop over every section and add it to the context
+                    for section in config.sections():
+                        file_data[section.upper()] = _upper_keys(dict(config.items(section)))
+                elif arg.endswith(".env"):
+                    import dotenv
+                    file_data = _upper_keys(dotenv.dotenv_values(arg))
+                else:
+                    raise ValueError(f"Unknown file type: {arg}")
+                _threadlocal.context = _threadlocal.context.new_child(file_data)
+            
+    yield _threadlocal.context
+    _threadlocal.context = _threadlocal.context.parents
 
 
 def global_context(key: Optional[str] = None, value: Any = None) -> Any:
     """Get or set a global context value.
+    You should normally use the context() function instead.
     
     :param key: The key to get or set.
     :param value: The value to set.
@@ -220,12 +267,12 @@ def global_context(key: Optional[str] = None, value: Any = None) -> Any:
     >>> # Set a value in the context
     >>> global_context("TEXT", "hello world")
     """
-    global _local
+    global _threadlocal
     if key and value is None:
-        return _local.ctx[key]
+        return _threadlocal.context[key]
     elif key and value is not None:
-        _local.ctx[key] = value
-    return _local.ctx
+        _threadlocal.context[key] = value
+    return _threadlocal.context
 
 
-__all__ = ["local_context", "global_context"]	
+__all__ = ["context", "global_context"]	

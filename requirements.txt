@@ -6,3 +6,4 @@ build
 twine
 python-dotenv
 click
+pyyaml

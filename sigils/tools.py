@@ -1,9 +1,8 @@
 import io
-import ast
 import functools
 import contextlib
 import multiprocessing as mp
-from typing import Union, Tuple, Text, Iterator, Callable, Any, Optional, TextIO
+from typing import Union, Text, Iterator, Callable, Any, Optional, TextIO
 
 from . import contexts
 from .parser import spool, parse, SigilContextTransformer
@@ -61,7 +60,7 @@ def splice(
             # By using a lark transformer, we parse and resolve
             # each sigil in isolation and in a single pass
             tree = parse(sigil[1:-1])
-            transformer = SigilContextTransformer(contexts._local.ctx)
+            transformer = SigilContextTransformer(contexts._threadlocal.context)
             value = transformer.transform(tree).children[0]
             # logger.debug("Sigil '%s' resolved to '%s'.", sigil, value)
             if value is not None:
@@ -95,7 +94,7 @@ resolve = functools.partial(splice, recursion=0)
 def vanish(
         text: str,
         pattern: Union[Text, Iterator],
-) -> Tuple[str, Tuple[str]]:
+) -> tuple[str, tuple[str]]:
     """
     Replace all sigils in the text with another pattern.
     Returns the replaced text and a list of sigils in found order.
@@ -116,6 +115,28 @@ def vanish(
     for sigil in set(sigils):
         text = (text.replace(sigil, str(next(_iter)) or sigil))
     return text, tuple(sigils)
+
+
+def unvanish(
+        text: str,
+        sigils: tuple[str] | list[str],
+        pattern: Union[Text, Iterator],
+) -> str:
+    """
+    De-replace all patterns in the text with sigils.
+
+    :param text: The text with the pattern to be replaced.
+    :param sigils: A list of sigils to be replaced in.
+    :param pattern: A text or iterator used to replace the patterns with.
+    :return: A tuple of: de-replaced text.
+    """
+
+    _iter = (iter(pattern) if isinstance(pattern, Iterator) 
+             else iter(pattern * len(sigils)))
+    for sigil in set(sigils):
+        text = (text.replace(str(next(_iter)) or sigil, sigil))
+    return text
+
 
 def execute(
         code: str,
@@ -144,4 +165,4 @@ def execute(
     return f.getvalue()
 
 
-__all__ = ["spool", "splice", "execute", "vanish", "resolve", ]
+__all__ = ["spool", "splice", "execute", "vanish", "unvanish", "resolve"]

@@ -65,6 +65,9 @@ Nesting can be done to any depth. If quotes are avoided around the inner sigils,
 data types will be preserved until the final interpolation.
 If quotes are used, the result is always a string.
 
+Sigils should *always* be uppercase. This is not enforced, but may cause 
+problems if you use lowercase sigils in your templates. Args are case-sensitive.
+
 
 Whitespace
 ----------
@@ -247,8 +250,52 @@ except as specified in this document:
 Quotes can be used interchangeably, but they must be balanced.
 
 
-Four Tools are Available
-------------------------
+Available Tools
+---------------
+
+Sigils comes with a number of tools that can be used to manipulate and
+interpolate sigils. You can load them individually, or all at once:
+
+.. code-block:: python
+
+    from sigils import *
+
+    # or
+
+    from sigils import context, spool, splice, execute, vanish
+
+Context
+~~~~~~~
+
+The *context* function is a context manager that can be used to manage
+the context for the other functions. It can be used to set the context
+for a single function call, or for a block of code.
+
+.. code-block:: python
+
+    from sigils import context, execute
+
+    with context(
+        USERNAME="arthexis",
+        SETTING={"BASE_DIR": "/home/arth/webapp"},
+    ):
+        result = execute("print('[[USERNAME]]')")
+        assert result == "arthexis"
+
+You can also pass a filename to the *context* function, which will try to
+guess the format and load the context from the file. The file can be in
+JSON, YAML, TOML or INI format.
+
+.. code-block:: python
+
+    from sigils import context, execute
+
+    with context("context.json"):
+        result = execute("print('[[USERNAME]]')")
+        assert result == "arthexis"
+
+Spool
+~~~~~
 
 The *spool* function iterates over all sigils in a string, yielding each one
 in the same order they appear in the string, without resolving them.
@@ -260,8 +307,7 @@ in the same order they appear in the string, without resolving them.
     sql = "select * from users where username = [[USER]]"
     assert list(spool(sql)) == ["[[USER]]"]
 
-
-Spoolling is a fast way to check if a string contains sigils without hitting the ORM
+Spool is a fast way to check if a string contains sigils without hitting the ORM
 or the network. For example:
 
 .. code-block:: python
@@ -273,6 +319,8 @@ or the network. For example:
     else:
         # do something else
 
+Splice & Resolve
+~~~~~~~~~~~~~~~~
 
 The *splice* function will replace any sigils found in the string with the
 actual values from the context. Returns the interpolated string.
@@ -289,8 +337,10 @@ actual values from the context. Returns the interpolated string.
         assert result == "arthexis: /home/arth/webapp"
 
 All keys in the context mapping should be strings (behavior is undefined if not)
-The use of uppercase keys is STRONGLY recommended but not required.
-Values can be anything, a string, a number, a list, a dict, or an ORM instance.
+and will be automatically converted to uppercase.
+
+Values can be anything: a string, a number, a list, a dict, or an ORM instance, 
+anything that can self-serialize to text with the *str* function works.
 
 .. code-block:: python
 
@@ -303,11 +353,28 @@ Values can be anything, a string, a number, a list, a dict, or an ORM instance.
     ):
         assert splice("[[MODEL.OWNER.UPPER]]") == "ARTHEXIS"
 
+If the value cannot or should not self-serialize, you can pass a function
+to use as the serializer. The function will be called with the value as-is.
+
+.. code-block:: python
+
+    class Model:
+        owner = "arthexis"
+                                       
+    def serializer(model):
+        return f"owner: {model.owner}"
+
+    with context(
+        MODEL: Model,   # [[MODEL.OWNER]]
+    ):
+        assert splice("[[MODEL]]", seralizer=serializer) == "owner: arthexis"
+
+
 You can pass additional context to splice directly: 
 
 .. code-block:: python
 
-    assert splice("[[NAME.UPPER]]", context={"NAME": "arth"}) == "ARTH"
+    assert splice("[[NAME.UPPER]]", **{"NAME": "arth"}) == "ARTH"
 
 By default, the splice function will recurse into the found values,
 interpolating any sigils found in them. This can be disabled by setting
@@ -325,9 +392,40 @@ the recursion parameter to 0. Default recursion is 6.
         result = splice("[[USERNAME]]: [[SETTINGS.BASE_DIR]]", recursion=1)
         assert result == "arthexis: /home/[[USERNAME]]"
 
-
 The function *resolve* is an alias for splice that never recurses.
 
+Vanish & Unvanish
+~~~~~~~~~~~~~~~~~
+
+The *vanish* function doesn't resolve sigils, instead it replaces them
+with another pattern of text and extracts all the sigils that were replaced
+to a map. This can be used for debugging, logging, async processing,
+or to sanitize user input that might contain sigils.
+
+.. code-block:: python
+
+    from sigils import vanish
+
+    text, sigils = vanish("select * from users where username = [[USER]]", "?")
+    assert text == "select * from users where username = ?"
+    assert sigils == ["[[USER]]"]
+
+
+The *unvanish* function does the opposite of vanish, replacing the 
+vanishing pattern with the sigils.
+
+.. code-block:: python
+
+    from sigils import vanish, unvanish
+
+    text, sigils = vanish("select * from users where username = [[USER]]", "?")
+    assert text == "select * from users where username = ?"
+    assert sigils == ["[[USER]]"]
+    assert unvanish(text, sigils) == "select * from users where username = [[USER]]"
+
+
+Execute
+~~~~~~~
 
 The *execute* function is similar to resolve, but executes the found text 
 as a python block (not an expression). This is useful for interpolating code:
@@ -344,7 +442,6 @@ as a python block (not an expression). This is useful for interpolating code:
         assert result == "arthexis"
         result = execute("print([[SETTING.BASE_DIR]])")
         assert result == "/home/arth/webapp"
-        
 
 Sigils will only be resolved within strings inside the code unless
 the unsafe flag is set to True. For example:
@@ -360,20 +457,6 @@ the unsafe flag is set to True. For example:
         assert result == "arthexis"
 
 
-The *vanish* function doesn't resolve sigils, instead it replaces them
-with another pattern of text and extracts all the sigils that were replaced
-to a map. This can be used for debugging, logging, async processing,
-or to sanitize user input that might contain sigils.
-
-.. code-block:: python
-
-    from sigils import vanish
-
-    text, sigils = vanish("select * from users where username = [[USER]]", "?")
-    assert text == "select * from users where username = ?"
-    assert sigils == ["[[USER]]"]
-
-
 Async & Multiprocessing
 -----------------------
 
@@ -382,14 +465,12 @@ them in loops, conditionals, and other control structures. For example:
 
 .. code-block:: python
 
-    from sigils import execute, context
+    from sigils import execute, splice, context
 
-    with context(
-        USERNAME="arthexis",
-        SETTING={"BASE_DIR": "/home/arth/webapp"},
-    ):
-        result = execute("if [[USERNAME]] == 'arthexis': print('yes')")
-        assert result == "yes"
+    with context("context.json"):
+        if result := execute("if '[[USERNAME]]' == 'arthexis': print('[[GROUP]]')"):
+            assert splice("[[USERNAME]]") == "arthexis"
+            assert result == "Administrators"
 
 
 This can also make it more efficient to resolve documents with many sigils,
@@ -398,6 +479,29 @@ instead of resolving each one individually.
 
 Django Integration
 ------------------
+
+There are several ways to integrate sigils with Django:
+
+- Use the *context* decorator to set the context for a view.
+- Use the *resolve* template tag to resolve sigils in templates.
+
+Context Decorator
+~~~~~~~~~~~~~~~~~
+
+The *context* decorator can be used to set the context for a view.
+For example, to set the context for a view in *views.py*:
+
+.. code-block:: python
+
+    from sigils import context
+
+    @context(
+        USERNAME="arthexis",
+        SETTING={"BASE_DIR": "/home/arth/webapp"},
+    )
+    def my_view(request):
+        ...
+
 
 You can create a `simple tag`_ to resolve sigils in templates.
 Create *<your_app>/templatetags/sigils.py* with the following code:
@@ -471,10 +575,6 @@ or files, with a given context. Example usage:
         --help                          Show this message and exit.
 
     $ sigils "Hello, [[USERNAME]]!" 
-    # arthexis/sigils
-
-    $ sigils -c "USERNAME=arthexis" README.md -o README2.md
-    $ cat README2.md
     # arthexis/sigils
 
 
