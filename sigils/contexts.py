@@ -194,6 +194,34 @@ def _upper_keys(d):
         return d
 
 
+def _load_context_file(filename):
+    filename = os.path.abspath(filename)
+    if filename.endswith(".toml"):
+        import tomllib
+        with open(filename, 'r') as f:
+            return _upper_keys(tomllib.loads(f.read()))
+    elif filename.endswith(".json"):
+        import json
+        with open(filename, 'r') as f:
+            return _upper_keys(json.loads(f.read()))
+    elif filename.endswith(".yaml") or filename.endswith(".yml"):
+        import yaml
+        with open(filename, 'r') as f:
+            return _upper_keys(yaml.safe_load(f.read()))
+    elif filename.endswith(".ini"):
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(filename)
+        file_data = {}
+        for section in config.sections():
+            file_data[section.upper()] = _upper_keys(dict(config.items(section)))
+        return file_data
+    elif filename.endswith(".env"):
+        import dotenv
+        return _upper_keys(dotenv.dotenv_values(filename))
+    else:
+        raise ValueError(f"Unknown file type: {filename}")
+
 
 @contextlib.contextmanager
 def context(*args, **kwargs) -> Generator[collections.ChainMap, None, None]:
@@ -219,33 +247,7 @@ def context(*args, **kwargs) -> Generator[collections.ChainMap, None, None]:
                 key, value = arg.split("=", 1)
                 _threadlocal.context[str(key).upper()] = value  # type: ignore
             else:
-                file_data = {}
-                # Convert arg to an absolute path
-                arg = os.path.abspath(arg)
-                if arg.endswith(".toml"):
-                    import tomllib
-                    with open(arg, 'r') as f:
-                        file_data = _upper_keys(tomllib.loads(f.read()))
-                elif arg.endswith(".json"):
-                    import json
-                    with open(arg, 'r') as f:
-                        file_data = _upper_keys(json.loads(f.read()))
-                elif arg.endswith(".yaml") or arg.endswith(".yml"):
-                    import yaml
-                    with open(arg, 'r') as f:
-                        file_data = _upper_keys(yaml.safe_load(f.read()))
-                elif arg.endswith(".ini"):
-                    import configparser
-                    config = configparser.ConfigParser()
-                    config.read(arg)
-                    # Loop over every section and add it to the context
-                    for section in config.sections():
-                        file_data[section.upper()] = _upper_keys(dict(config.items(section)))
-                elif arg.endswith(".env"):
-                    import dotenv
-                    file_data = _upper_keys(dotenv.dotenv_values(arg))
-                else:
-                    raise ValueError(f"Unknown file type: {arg}")
+                file_data = _load_context_file(arg)
                 _threadlocal.context = _threadlocal.context.new_child(file_data)
             
     yield _threadlocal.context
