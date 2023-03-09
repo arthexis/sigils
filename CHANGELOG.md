@@ -6,7 +6,6 @@ Release Notes
 
 - Added pyyaml dependency.
 - Added tox and githib actions for automated testing.
-- 
 
 0.2.4 (2023-03-08)
 -------------------
