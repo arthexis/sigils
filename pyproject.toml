@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.2.6"
+version = "0.2.7"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
 description = "Manage context-less text with [[SIGILS]]."
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["utils", "sigils", "string", "text", "magic", "context"]
 license = {text = "MIT"}
 classifiers = [
