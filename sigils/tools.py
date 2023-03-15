@@ -2,7 +2,7 @@ import io
 import functools
 import contextlib
 import multiprocessing as mp
-from typing import Union, Text, Iterator, Callable, Any, Optional, TextIO
+from typing import Union, Text, Iterator, Callable, Any, Optional, TextIO, Tuple, List
 
 from . import contexts
 from .parser import spool, parse, SigilContextTransformer
@@ -119,7 +119,7 @@ def vanish(
 
 def unvanish(
         text: str,
-        sigils: tuple[str] | list[str],
+        sigils: Tuple[str] | List[str],
         pattern: Union[Text, Iterator],
 ) -> str:
     """

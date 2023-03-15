@@ -45,7 +45,6 @@ def main(text, on_error, verbose, default, interactive, file, exec, context):
             text = f.read()
     else:
         text = " ".join(text)
-    print(f"Context: {context}")
     with local_context(*context):
         if not exec:
             result = splice(text, on_error=on_error, default=default)
