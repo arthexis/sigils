@@ -119,7 +119,7 @@ def vanish(
 
 def unvanish(
         text: str,
-        sigils: Tuple[str] | List[str],
+        sigils: Union[Tuple[str], List[str]],
         pattern: Union[Text, Iterator],
 ) -> str:
     """
