@@ -146,3 +146,29 @@ def test_vanish_unvanish():
     assert sql == "select * from ?"
     assert sigils == ("[[TABLE]]",)
     assert unvanish(sql, sigils, pattern="?") == text
+
+
+def test_splice_long():
+    text = """
+    Hello World, my name is [[PERSON.NAME]] and I'm [[PERSON.AGE]] years old.
+    I live in [[PERSON.ADDRESS.CITY]], [[PERSON.ADDRESS.COUNTRY]].
+    I'm a [[PERSON.JOB.TITLE]] at [[PERSON.JOB.COMPANY]].
+    I'm married to [[PERSON.SPOUSE.NAME]] and we have [[PERSON.SPOUSE.CHILDREN]] children.
+    """
+    with context(
+        PERSON={
+            "NAME": "Foo Bar",
+            "AGE": 30,
+            "ADDRESS": {"CITY": "London", "COUNTRY": "UK"},
+            "JOB": {"TITLE": "Developer", "COMPANY": "ACME"},
+            "SPOUSE": {"NAME": "Jane Doe", "CHILDREN": 2},
+        }
+    ):
+        assert splice(text) == """
+    Hello World, my name is Foo Bar and I'm 30 years old.
+    I live in London, UK.
+    I'm a Developer at ACME.
+    I'm married to Jane Doe and we have 2 children.
+    """
+        
+

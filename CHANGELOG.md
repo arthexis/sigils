@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+0.2.9 (2023-03-27)
+-------------------
+
+- Refactored the FUNCTION_MAP into the *funcs.py* module.
+- Added a simple benchmarking script.
+
 0.2.7 (2023-03-14)
 -------------------
 

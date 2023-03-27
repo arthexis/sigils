@@ -1,5 +1,9 @@
 lark
 django
+pytest
+sdist
+build
+twine
 python-dotenv
 click
 pyyaml
