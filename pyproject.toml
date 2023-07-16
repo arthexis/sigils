@@ -4,52 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.2.9"
+version = "0.3.1"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
-description = "Manage context-less text with [[SIGILS]]."
+description = "Interpolate with %[sigils]."
 readme = "README.rst"
-requires-python = ">=3.9"
-keywords = ["utils", "sigils", "string", "text", "magic", "context"]
+requires-python = ">=3.10"
+keywords = ["utils", "sigils", "string", "text", "context"]
 license = {text = "MIT"}
 classifiers = [
     'Development Status :: 3 - Alpha',
     'Intended Audience :: Developers',
     'Topic :: Software Development :: Libraries',
-    'Topic :: Software Development :: Embedded Systems',
     'Topic :: Text Processing :: Markup',
     'Topic :: Software Development :: Pre-processors',
     'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     'Environment :: Console',
     'License :: OSI Approved :: MIT License',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
 ]
 dependencies = [
-    'lark',
-    'lark-parser',
-    'click',
-    'pyyaml',
 ]
 
 [project.urls]
 Source = "https://github.com/arthexis/sigils"
 Bug-Tracker = "https://github.com/arthexis/sigils/issues"
 
-[project.optional-dependencies]
-django = [
-    "Django>=3.2"
-]
-dev = [
-    "pytest", 
-    "pytest-cov", 
-    "python-dotenv",
-    "tox",
-]
 
 [project.scripts]
-sigils = "sigils.cli:main"
+sigils = "sigils.__main__:main"
 

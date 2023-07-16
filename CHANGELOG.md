@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+0.3.1 (2023-07-15)
+-------------------
+
+Complete revamp and simplification of the library.
+
+Sigils now use the following syntax:
+
+%[sigil-name]
+%[sigil-name:arg1:arg2:...]
+%[sigil_name]
+%[sigil_name:key1=value1:key2=value2:...]
+
+Check the new README.rst for more information.
+
 0.2.9 (2023-03-27)
 -------------------
 

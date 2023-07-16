@@ -1,5 +1,0 @@
-lark
-django
-python-dotenv
-click
-pyyaml

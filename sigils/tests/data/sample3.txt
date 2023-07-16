@@ -1,3 +1,0 @@
-Lang: [[SYS.ENV.LANG]]
-OS: [[SYS.ENV.OS]]
-Path: [[SYS.ENV.PATH]]
