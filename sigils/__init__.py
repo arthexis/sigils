@@ -49,23 +49,29 @@ class Sigil:
                 for i, key in enumerate(keys):
                     if ':' in key:
                         key, *function_args = key.split(':')
-                    if isinstance(value, dict):
+                    literal = False
+                    if key.startswith('%'):
+                        key = key[1:]
+                        literal = True
+                    if literal:
+                        temp = key
+                    elif isinstance(value, dict):
                         temp = value.get(key)
                     elif isinstance(value, list) and key.isdigit():
                         temp = value[int(key)]
                     else:
                         temp = None
-                    if temp is None and '-' in key:
+                    if temp is None and '-' in key and not literal:
                         temp = value.get(key.replace('-', '_')) if isinstance(value, dict) else None
-                    if temp is None and hasattr(value, key):
+                    if temp is None and hasattr(value, key) and not literal:
                         temp = getattr(value, key)
-                    if temp is None and '-' in key and hasattr(value, key.replace('-', '_')):
+                    if temp is None and '-' in key and hasattr(value, key.replace('-', '_')) and not literal:
                         temp = getattr(value, key.replace('-', '_'))
                     if temp is not None:
                         value = temp
                         if callable(value) and execute:
                             if function_args:
-                                resolved_function_args = [Sigil(f'%[{arg[1:]}]').interpolate(context) if arg.startswith('%') else arg for arg in function_args]
+                                resolved_function_args = [Sigil(f'%[{arg}]').interpolate(context) for arg in function_args]
                                 value = value(*resolved_function_args)
                             else:
                                 value = value()

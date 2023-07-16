@@ -2,7 +2,11 @@
 Sigils
 ================
 
-Sigils is a Python library for powerful and flexible string interpolation. It provides advanced capabilities such as context-based interpolation, function execution, nested and recursive interpolation, case-insensitive matching, and global context support.
+"An inscribed or painted symbol considered to have magical power."
+
+Sigils is a Python library for magic and string interpolation. It provides advanced capabilities such as context-based interpolation, function execution, nested and recursive interpolation, case-insensitive matching, and global context support.
+
+Any Python object can be provided as context, including nested dictionaries, lists, and functions. Sigils can be used directly from Python or from the command line. Sigils is thread-safe and has no dependencies outside of the Python standard library.
 
 Installation
 ============
@@ -38,8 +42,12 @@ Sigils can handle function execution and nested interpolation:
             "greet": lambda name: f"Hello, {name}!"
         }
     }
+    
     s = Sigil("%[user.greet:user.name]")
     print(s % context)  # Outputs: Hello, Alice!
+
+    s = Sigil("%[user.greet:%%user.name]")
+    print(s % context)  # Outputs: Hello, %user.name! %user.name is treated as a literal value
 
 Sigils support case-insensitive matching and global context fallback:
 
@@ -51,6 +59,17 @@ Sigils support case-insensitive matching and global context fallback:
     with Sigil.Context(global_context):
         s = Sigil("%[GREETING]")
         print(s % {})  # Outputs: Hello, world!
+
+Command-Line Usage
+==================
+
+Sigils can be used directly from the command line. Here's an example:
+
+.. code-block:: bash
+
+    sigils "Hello, %[user.name]!" -c context.json
+
+In this example, "context.json" is a JSON file with a structure like {"user": {"name": "Alice"}}. The command will output: "Hello, Alice!".
 
 Considerations
 ==============

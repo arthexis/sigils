@@ -37,11 +37,11 @@ class TestSigil(unittest.TestCase):
         self.assertEqual(s % self.context, "Hello, World!")
 
     def test_callable_with_args_interpolation(self):
-        s = Sigil("%[callable_with_args:%name]")
+        s = Sigil("%[callable_with_args:name]")
         self.assertEqual(s % self.context, "Hello, Alice!")
 
     def test_callable_with_literal_args(self):
-        s = Sigil("%[callable_with_args:name]")
+        s = Sigil("%[callable_with_args:%name]")
         self.assertEqual(s % self.context, "Hello, name!")
 
     def test_sigils(self):
@@ -65,11 +65,11 @@ class TestSigil(unittest.TestCase):
 
     def test_nested_callable_with_args_interpolation(self):
         self.context['nested']['callable_with_args'] = lambda x: f"Hello, {x}!"
-        s = Sigil("Message: %[nested.callable_with_args:%name]")
+        s = Sigil("Message: %[nested.callable_with_args:name]")
         self.assertEqual(s % self.context, "Message: Hello, Alice!")
 
     def test_recursive_callable(self):
-        s = Sigil("Message: %[recursive:%name]")
+        s = Sigil("Message: %[recursive:name]")
         self.assertEqual(s % self.context, "Message: Hello, Alice!")
 
 
