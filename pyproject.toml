@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.3.3"
+version = "0.3.5"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
-description = "Interpolate with %[sigils]."
+description = "Interpolate %[meta-text] with %[sigils]."
 readme = "README.rst"
-requires-python = ">=3.10"
-keywords = ["utils", "sigils", "string", "text", "context"]
+requires-python = ">=3.9"
+keywords = ["utils", "sigils", "string", "text", "meta-text", "context"]
 license = {text = "MIT"}
 classifiers = [
     'Development Status :: 3 - Alpha',
@@ -23,6 +23,7 @@ classifiers = [
     'Environment :: Console',
     'License :: OSI Approved :: MIT License',
     'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
 ]

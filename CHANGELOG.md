@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+0.3.5 (2023-07-16)
+-------------------
+
+Added (simplified) support for function tools once again.
+
+This should work: %[sigil-name.field.upper]
+
+0.3.4 (2023-07-16)
+-------------------
+
+Restore backwards compatibility with Python 3.9.
+
 0.3.1 (2023-07-15)
 -------------------
 

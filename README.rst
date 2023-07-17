@@ -4,7 +4,7 @@ Sigils
 
 "An inscribed or painted symbol considered to have magical power."
 
-Sigils is a Python library for magic and string interpolation. It provides advanced capabilities such as context-based interpolation, function execution, nested and recursive interpolation, case-insensitive matching, and global context support.
+Sigils is a Python library for text and meta-text interpolation. It provides advanced capabilities such as context-based interpolation, function execution, nested and recursive interpolation, case-insensitive matching, and global context support.
 
 Any Python object can be provided as context, including nested dictionaries, lists, and functions. Sigils can be used directly from Python or from the command line. Sigils is thread-safe and has no dependencies outside of the Python standard library.
 
