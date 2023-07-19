@@ -1,7 +1,14 @@
 Release Notes
 =============
 
-0.3.5 (2023-07-16)
+0.3.6 (2023-07-19)
+-------------------
+
+Add the --field command line option to the sigil command.
+
+Refactor Sigil to split _resolve into "_resolve_map" and "_resolve_key".
+
+0.3.5 (2023-07-17)
 -------------------
 
 Added (simplified) support for function tools once again.

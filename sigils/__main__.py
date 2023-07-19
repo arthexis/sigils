@@ -1,10 +1,12 @@
 import argparse
 import sys
+import random
 from sigils import Sigil
 
 def main():
     parser = argparse.ArgumentParser(description="Interpolate sigils in text.")
     parser.add_argument("text", nargs='?', default="", help="Text with sigils.")
+    parser.add_argument("--file", "-f", help="Path to a file containing text with sigils.")
     parser.add_argument("--context", "-c", help="JSON/TOML file to provide context for interpolation.")
     parser.add_argument("--target", "-t", help="Target key in the context for interpolation.")
     parser.add_argument("--max-depth", "-d", type=int, default=6, help="Maximum recursion depth.")
@@ -31,6 +33,13 @@ def main():
         from .benchmark import run_benchmark
         run_benchmark()
     else:
+        # Load content from file if specified
+        if args.file:
+            with open(args.file, 'r') as file:
+                template = file.read()
+        else:
+            template = args.text
+
         context_file = args.context
         if context_file:
             with open(context_file, 'r') as f:
@@ -48,13 +57,15 @@ def main():
                     sys.exit(1)
         else:
             context = {}
+
         for entry in args.value:
             key, value = entry.split('=', 1)  # Split on the first '='
             context[key] = value
+
         if args.target:
             context = context.get(args.target)
 
-        sigil = Sigil(args.text)
+        sigil = Sigil(template)
         result = sigil.interpolate(
             context, 
             debug=args.debug, 
