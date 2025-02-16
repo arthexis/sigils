@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
-version = "0.3.5"
+version = "0.3.6"
 authors = [
     {name = "Rafael Jesús Guillén Osorio", email = "arthexis@gmail.com"},
 ]
@@ -30,10 +30,14 @@ classifiers = [
 dependencies = [
 ]
 
+[project.optional-dependencies]
+dotenv = ["dotenv-python"]
+toml = ["toml"]
+all = ["dotenv-python", "toml"]
+
 [project.urls]
 Source = "https://github.com/arthexis/sigils"
 Bug-Tracker = "https://github.com/arthexis/sigils/issues"
-
 
 [project.scripts]
 sigils = "sigils.__main__:main"

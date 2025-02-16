@@ -1,6 +1,8 @@
-import argparse
 import sys
+import random
+import argparse
 from sigils import Sigil
+
 
 def main():
     parser = argparse.ArgumentParser(description="Interpolate sigils in text.")
@@ -8,7 +10,8 @@ def main():
     parser.add_argument("--context", "-c", help="JSON/TOML file to provide context for interpolation.")
     parser.add_argument("--target", "-t", help="Target key in the context for interpolation.")
     parser.add_argument("--max-depth", "-d", type=int, default=6, help="Maximum recursion depth.")
-    parser.add_argument("--value", "-v", action='append', default=[], help='Additional context entries in the format KEY=VALUE. Can be used multiple times.')
+    parser.add_argument("--value", "-v", action='append', default=[], 
+                        help='Additional context entries in the format KEY=VALUE. Can be used multiple times.')
     parser.add_argument("--test", action='store_true', help="Run tests.")
     parser.add_argument("--benchmark", action='store_true', help="Run benchmark.")
     parser.add_argument("--seed", type=int, default=None, help="Seed for random number generation.")
@@ -29,7 +32,7 @@ def main():
         unittest.TextTestRunner().run(suite)
     elif args.benchmark:
         from .benchmark import run_benchmark
-        run_benchmark()
+        run_benchmark(debug=args.debug)
     else:
         context_file = args.context
         if context_file:
@@ -54,12 +57,9 @@ def main():
         if args.target:
             context = context.get(args.target)
 
+        # TODO: Pass args to the Sigil class rather to interpolate
         sigil = Sigil(args.text)
-        result = sigil.interpolate(
-            context, 
-            debug=args.debug, 
-            max_depth=args.max_depth
-        )
+        result = sigil.interpolate(context)
         print(result)
 
 if __name__ == "__main__":

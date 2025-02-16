@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+
+0.3.6 (2025-02-16)
+-------------------
+
+Completed:
+
+- Fixed dependencies
+- Added builting tool to gather other tools
+- Improved benchmark
+- Allow negative array on indexes (TODO: Test)
+- Refactor sigil methods to leverage __init__
+
+In Roadmap:
+
+- Tests for loadenv
+- Better docs for included functions
+- Allow decimal numbers as keys
+
+
 0.3.5 (2023-07-16)
 -------------------
 

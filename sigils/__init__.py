@@ -20,35 +20,42 @@ class Sigil:
         def __exit__(self, exc_type, exc_val, exc_tb):
             self._context.value = self.old_context
 
-    def __init__(self, template):
+    # Default settings at the class level
+    execute = True
+    max_depth = 6
+    debug = False
+    on_error = "propagate"
+
+    def __init__(self, template, execute=None, max_depth=None, debug=None, on_error=None):
         """
         Initialize a new Sigil instance.
 
         Args:
             template (str): The template string.
-
-        Example usage:
-
-        ```python
-        s = Sigil("Hello, %[name]!")
-        ```
-
+            execute (bool, optional): Whether to execute callable values.
+            max_depth (int, optional): Maximum depth for resolving sigils.
+            debug (bool, optional): Enable debug logging.
         """
         self.template = template
+
+        # Use instance-specific values or fall back to class defaults
+        self.execute = execute if execute is not None else self.__class__.execute
+        self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
+        self.debug = debug if debug is not None else self.__class__.debug
+        self.on_error = on_error if on_error is not None else self.__class__.on_error
+
         self.pattern = getattr(self._cache, 'value', {}).get(template)
         if self.pattern is None:
             self.pattern = re.compile(r'%\[(.*?)\]')
             self._cache.value = {template: self.pattern}
 
-    def _run_func_with_sigil_args(self, func, func_args, value, context, execute, max_depth, debug):
+    def _run_function(self, func, func_args, value, context):
         num_args = func.__code__.co_argcount
         if func_args:
-            if debug:
+            if self.debug:
                 print(f"Tool: {func}, value: {value}, func_args: {func_args}")
-            resolved_args = [Sigil(f'%[{arg}]').interpolate(
-                context, execute, max_depth
-            ) for arg in func_args]
-            if debug:
+            resolved_args = [Sigil(f'%[{arg}]').interpolate(context) for arg in func_args]
+            if self.debug:
                 print(f"Resolved args: {resolved_args}")
             if num_args > 0:
                 if resolved_args and '%[' not in resolved_args[0]:
@@ -59,17 +66,17 @@ class Sigil:
                 return func()
         else:
             if num_args == 1:
-                return func(str(value))
+                return func(value)
             else:
                 return func()
 
-    def _resolve(self, context, depth=0, execute=True, max_depth=6, debug=False):
+    def _resolve(self, context, depth=0):
         resolved = {}
         for match in self.pattern.findall(self.template):
-            if debug:
+            if self.debug:
                 print(f"Found match: {match}")
             keys = match.split('.')
-            if debug:
+            if self.debug:
                 print(f"Split keys: {keys}")
             value = context
             func_args = []
@@ -78,7 +85,7 @@ class Sigil:
                     key_parts = key.split(':')
                     key = key_parts[0]
                     func_args = key_parts[1:]
-                if debug:
+                if self.debug:
                     print(f"Processing key: {key}, func_args: {func_args}")
                 literal = False
                 if key.startswith('%'):
@@ -87,32 +94,33 @@ class Sigil:
                 if literal:
                     temp = key
                 elif value and isinstance(value, dict) and key in value:
-                    if debug:
+                    if self.debug:
                         print(f"Value is a dict with the key: {value}")
                     temp = value.get(key, None)
                     if callable(temp):
-                        temp = self._run_func_with_sigil_args(
-                            temp, func_args, value, context, execute, max_depth, debug)
-                elif value and isinstance(value, list) and key.isdigit():
-                    if debug:
+                        temp = self._run_function(
+                            temp, func_args, value, context)
+                elif value and isinstance(value, list) and key.lstrip("+-").isdigit():
+                    # TODO: This i probably what doesnt let negative indexes work
+                    if self.debug:
                         print(f"Value is a list: {value}")
                     temp = value[int(key)]
                 elif key in tools:
-                    if debug:
+                    if self.debug:
                         print(f"Found tool: {key}")
                     tool_func = tools[key]
                     if callable(tool_func):
-                        temp = self._run_func_with_sigil_args(
-                            tool_func, func_args, value, context, execute, max_depth, debug)
+                        temp = self._run_function(
+                            tool_func, func_args, value, context)
                     else:
-                        if debug:
+                        if self.debug:
                             print(f"Non-callable tool: {tool_func}")
                         temp = tool_func
                 else:
-                    if debug:
+                    if self.debug:
                         print(f"Value is an object: {value}")
                     temp = None
-                if debug:
+                if self.debug:
                     print(f"Temp value: {temp}")
                 if temp and callable(temp):
                     temp = temp()
@@ -125,7 +133,7 @@ class Sigil:
                 if temp is not None:
                     value = temp
                 else:
-                    if debug:
+                    if self.debug:
                         print(f"Could not find value for key: {key}")
                     value = None
                     break
@@ -136,39 +144,34 @@ class Sigil:
                 value = global_context.get(match.replace('-', '_'), None)
                 if value is not None:
                     resolved[match] = value
-        if depth < max_depth:
+        if depth < self.max_depth:
             for key, value in list(resolved.items()):
                 if isinstance(value, str) and '%' in value:
-                    if debug:
+                    if self.debug:
                         print(f"Found nested sigil: {value}")
                     s = Sigil(value)
-                    resolved_value = s._resolve(context, depth + 1, execute, max_depth, debug)
+                    resolved_value = s._resolve(context, depth + 1)
                     if resolved_value:
                         resolved[key] = {
-                            'value': s.interpolate(context, execute, max_depth, debug),
+                            'value': s.interpolate(context),
                             'sub_values': resolved_value
                         }
                     else:
                         resolved[key] = {'value': value}
         return resolved
 
-    def interpolate(self, context, execute=True, max_depth=6, handle_errors="propagate", debug=False):
+    def interpolate(self, context):
         """
         Interpolate the template with the provided context.
 
         Args:
             context (dict or object): The context from which to take the values.
-            execute (bool, optional): If True, execute any callable values found in the context. Defaults to True.
-            max_depth (int, optional): The maximum depth for resolving nested sigils. Defaults to 6.
-            handle_errors (str, optional): How to handle errors that occur during interpolation. 
-                Can be "propagate" (raise the error), "ignore" (return the original template), 
-                "replace" (replace the template with the error message). Defaults to "propagate".
 
         Returns:
             str: The interpolated string.
 
         Raises:
-            Exception: If handle_errors is set to "propagate" and an error occurs during interpolation.
+            Exception: If on_error is set to "propagate" and an error occurs during interpolation.
 
         Example usage:
 
@@ -182,19 +185,22 @@ class Sigil:
         if context is None:
             context = Sigil.Context.current_context
         try:
-            resolved = self._resolve(context, 0, execute, max_depth, debug)
+            resolved = self._resolve(context, 0)
         except Exception as e:
-            if handle_errors == "propagate":
+            if self.on_error == "propagate":
                 raise e
-            elif handle_errors == "ignore":
+            elif self.on_error == "ignore":
                 return self.template
-            else:  # handle_errors == "replace"
-                return str(e)
+            else:  # on_error == "replace"
+                return e
         parts = self.pattern.split(self.template)
         for i in range(1, len(parts), 2):
             value = resolved.get(parts[i])
             if isinstance(value, dict):
-                parts[i] = value['value']
+                if "value" in value:
+                    parts[i] = value["value"]
+                else:
+                    parts[i] = "|".join(value.keys())
             else:
                 parts[i] = str(value) if value is not None else f'%[{parts[i]}]'
         result = ''.join(parts)
@@ -223,8 +229,7 @@ class Sigil:
 
     def __mod__(self, context):
         """
-        Operator overload for the modulus (%) operator. This allows for easy interpolation of the template 
-        with the provided context.
+        Operator overload for the modulus (%) operator.
 
         Args:
             context (dict or object): The context from which to take the values.
@@ -243,6 +248,8 @@ class Sigil:
         """
         result = self.interpolate(context or {})
         return result
-        
+    
 
-__all__ = ['Sigil']
+Context = Sigil.Context
+
+__all__ = ['Sigil', 'Context']
