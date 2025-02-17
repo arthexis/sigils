@@ -8,6 +8,7 @@ def main():
     parser = argparse.ArgumentParser(description="Interpolate sigils in text.")
     parser.add_argument("text", nargs='?', default="", help="Text with sigils.")
     parser.add_argument("--context", "-c", help="JSON/TOML file to provide context for interpolation.")
+    parser.add_argument("--expression", "--expr", "-e", help="Wrap expression in %[sigils].")
     parser.add_argument("--target", "-t", help="Target key in the context for interpolation.")
     parser.add_argument("--max-depth", "-d", type=int, default=6, help="Maximum recursion depth.")
     parser.add_argument("--value", "-v", action='append', default=[], 
@@ -19,6 +20,7 @@ def main():
     parser.add_argument("--debug", action='store_true', help="Print debug output.")
 
     args = parser.parse_args()
+    Sigil.debug = args.debug
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -57,7 +59,8 @@ def main():
         if args.target:
             context = context.get(args.target)
 
-        # TODO: Pass args to the Sigil class rather to interpolate
+        if args.expression:
+            args.text = f"{args.text}%[{args.expression}]"
         sigil = Sigil(args.text)
         result = sigil.interpolate(context)
         print(result)

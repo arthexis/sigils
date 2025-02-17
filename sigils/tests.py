@@ -5,8 +5,6 @@ from sigils import Sigil
 
 class TestSigil(unittest.TestCase):
     def setUp(self):
-        Sigil.debug = True
-
         def recursive(x):
             return f"Hello, {x}!"
 
@@ -25,9 +23,13 @@ class TestSigil(unittest.TestCase):
             "AGE": 40,      # Upper case key
         }
 
-    def test_custom_debug(self):
-        s = Sigil("Hello, %[name]!")
-        self.assertTrue(s.debug)  # Ensures debug mode is enabled for testing
+    def test_custom_debug_true(self):
+        s = Sigil("Hello, %[name]!", debug=True)
+        self.assertTrue(s.debug)  
+
+    def test_custom_debug_false(self):
+        s = Sigil("Hello, %[name]!", debug=False)
+        self.assertFalse(s.debug)  
 
     def test_interpolation(self):
         s = Sigil("Hello, %[name]!")
@@ -53,9 +55,9 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[callable_with_args:%name]")
         self.assertEqual(s % self.context, "Hello, name!")
 
-    def test_sigils(self):
+    def test_sigil_results(self):
         s = Sigil("Hello, %[name]!")
-        self.assertEqual(s.sigils(self.context), {"name": "Alice"})
+        self.assertEqual(s.results(self.context), {"name": "Alice"})
 
     def test_recursive_interpolation(self):
         self.context["a"] = "%[b]"

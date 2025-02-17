@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+0.3.7 (2025-02-??)
+-------------------
+
+New in this version:
+- The ARTHEXIS License
+- Expression mode for CLI (-e)
+- %[env.PATH] == %[PATH.env] (only True for env)
+- Removed slow debug logging
+
+In Roadmap:
+
+- Proper configurable logging
+
 
 0.3.6 (2025-02-16)
 -------------------

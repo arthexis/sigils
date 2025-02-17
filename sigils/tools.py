@@ -13,11 +13,11 @@ import sys
 
 def lower(target):
     """Converts a string to lowercase."""
-    return target.lower()
+    return str(target).lower()
 
 def upper(target):
     """Converts a string to uppercase."""
-    return target.upper()
+    return str(target).upper()
 
 def trim(target):
     """Removes leading and trailing whitespace from a string."""
@@ -93,23 +93,25 @@ FORBIDDEN_ENV = [
 
 def env(target):
     """Returns the value of an environment variable."""
-    print(target)
-    if target is None:
-        return ''
+    if not target:
+        return dict(os.environ)
+    target = str(target)
     # Avoid secrets in the environment. This is not a complete list.
     for forbidden in FORBIDDEN_ENV:
         if forbidden in target.upper():
             return ''
     return os.environ.get(target.upper())
 
-def epoch(target=None):
+def epoch(target):
     """Return server time in seconds since the epoch."""
-    return str(time.time())
+    if target:
+        return time.time() - int(target)
+    return time.time()
 
 # Wrap the input in a %[sigil]
-def sigil(target, sigil_start='%[', sigil_end=']'):
+def sigil(target, start='%[', end=']'):
     """Wraps a string in a sigil, or any other string."""
-    return f"{sigil_start}{target}{sigil_end}"
+    return f"{start}{target}{end}"
 
 # List available sigils (one level deep), separated by a comma
 def sigils(target):
@@ -121,9 +123,9 @@ def nth(target, n, delimiter=','):
     """Returns the nth item in a list."""
     return target.split(delimiter)[int(n)]
 
-def split(target, input_delimiter=',', output_delimiter=','):
+def split(target, delimiter=',', separator=','):
     """Splits a string into a list. Returns the list separated by a delimiter (comma by default)."""
-    return output_delimiter.join(target.split(input_delimiter))
+    return separator.join(target.split(delimiter))
 
 def month(target=None):
     """Returns the name of a month from a month number or current month."""
@@ -140,8 +142,8 @@ def day(target=None):
 def year(target=None):
     """Returns the current year or the year from a timestamp."""
     if target is None:
-        return str(time.localtime().tm_year)
-    return str(time.localtime(int(target)).tm_year)
+        return time.localtime().tm_year
+    return time.localtime(int(target)).tm_year
 
 def date(target=None, format='%Y-%m-%d'):
     """Returns the current date or the date from a timestamp."""
@@ -190,17 +192,18 @@ def zodiac(target=None):
     else:
         return ""
 
-def weekday(target=None):
+def weekday(target):
     """Returns the weekday for the current date or the date from a timestamp."""
-    if target is None:
+    if not target:
         return calendar.day_name[time.localtime().tm_wday]
     return calendar.day_name[time.localtime(int(target)).tm_wday]
 
-def rand(target=None):
+def rand(target):
     """Returns a random number between 0 and 1."""
-    if target is None:
-        return str(random.random())
-    return str(random.random() * float(target))
+    if not target:
+        return random.random()
+    return random.random() * float(target)
+
 
 def randint(target):
     """Returns a random integer between 0 and the input number."""
@@ -383,131 +386,131 @@ def morse(target):
 def log(target):
     """Returns the natural logarithm of a number."""
     import math
-    return str(math.log(float(target)))
+    return math.log(float(target))
 
 def log10(target):
     """Returns the base-10 logarithm of a number."""
     import math
-    return str(math.log10(float(target)))
+    return math.log10(float(target))
 
 def log2(target):
     """Returns the base-2 logarithm of a number."""
     import math
-    return str(math.log2(float(target)))
+    return math.log2(float(target))
 
 def sqrt(target):
     """Returns the square root of a number."""
     import math
-    return str(math.sqrt(float(target)))
+    return math.sqrt(float(target))
 
 def sin(target):
     """Returns the sine of a number."""
     import math
-    return str(math.sin(float(target)))
+    return math.sin(float(target))
 
 def cos(target):
     """Returns the cosine of a number."""
     import math
-    return str(math.cos(float(target)))
+    return math.cos(float(target))
 
 def tan(target):
     """Returns the tangent of a number."""
     import math
-    return str(math.tan(float(target)))
+    return math.tan(float(target))
 
 def asin(target):
     """Returns the arcsine of a number."""
     import math
-    return str(math.asin(float(target)))
+    return math.asin(float(target))
 
 def acos(target):
     """Returns the arccosine of a number."""
     import math
-    return str(math.acos(float(target)))
+    return math.acos(float(target))
 
 def atan(target):
     """Returns the arctangent of a number."""
     import math
-    return str(math.atan(float(target)))
+    return math.atan(float(target))
 
 def degrees(target):
     """Converts radians to degrees."""
     import math
-    return str(math.degrees(float(target)))
+    return math.degrees(float(target))
 
 def radians(target):
     """Converts degrees to radians."""
     import math
-    return str(math.radians(float(target)))
+    return math.radians(float(target))
 
 def celcius(target):
     """Converts Fahrenheit to Celcius."""
-    return str((float(target) - 32) * 5 / 9)
+    return (float(target) - 32) * 5 / 9
 
 def fahrenheit(target):
     """Converts Celcius to Fahrenheit."""
-    return str(float(target) * 9 / 5 + 32)
+    return float(target) * 9 / 5 + 32
 
 def kelvin(target):
     """Converts Celcius to Kelvin."""
-    return str(float(target) + 273.15)
+    return float(target) + 273.15
 
 def imperial(target):
     """Converts metric units to imperial units."""
-    return str(float(target) * 0.0393701)
+    return float(target) * 0.0393701
 
 def metric(target):
     """Converts imperial units to metric units."""
-    return str(float(target) * 25.4)
+    return float(target) * 25.4
 
 def floor(target):
     """Rounds a number down to the nearest integer."""
     import math
-    return str(math.floor(float(target)))
+    return math.floor(float(target))
 
 def ceil(target):
     """Rounds a number up to the nearest integer."""
     import math
-    return str(math.ceil(float(target)))
+    return math.ceil(float(target))
 
 def round(target):
     """Rounds a number to the nearest integer."""
-    return str(int(float(target) + 0.5))
+    return int(float(target) + 0.5)
 
 def abs(target):
     """Returns the absolute value of a number."""
     import math
-    return str(math.fabs(float(target)))
+    return math.fabs(float(target))
 
 def factorial(target):
     """Returns the factorial of a number."""
     import math
-    return str(math.factorial(int(target)))
+    return math.factorial(int(target))
 
 def isprime(target):
     """Returns True if a number is prime, False otherwise."""
     import math
-    return str(math.isprime(int(target)))
+    return math.isprime(int(target))
 
 def add(target, n):
     """Adds a number to a number."""
-    return str(float(target) + float(n))
+    return float(target) + float(n)
 
 def subtract(target, n):
     """Subtracts a number from a number."""
-    return str(float(target) - float(n))
+    return float(target) - float(n)
 
 def divide(target, n):
     """Divides a number by a number."""
-    return str(float(target) / float(n))
+    return float(target) / float(n)
 
 def negate(target):
     """Negates a number."""
-    return str(-float(target))
+    return -float(target)
 
 def sign(target):
     """Returns the sign of a number."""
-    return str(float(target) / abs(float(target)))
+    return float(target) / abs(float(target))
 
 def lunar(target=None):
     """Returns the current lunar phase or the lunar phase from a timestamp."""
@@ -521,7 +524,7 @@ def lunar(target=None):
 
 def search(target, substring):
     """Returns True if a substring is found in a string, False otherwise."""
-    return str(substring in target)
+    return substring in target
 
 def length(target):
     """Returns the length of a string or list."""
@@ -529,15 +532,15 @@ def length(target):
 
 def lines(target):
     """Returns the number of lines in a string."""
-    return str(len(target.split('\n')))
+    return len(target.split('\n'))
 
 def words(target):
     """Returns the number of words in a string."""
-    return str(len(target.split()))
+    return len(target.split())
 
 def average(target):
     """Returns the average of a list of numbers."""
-    return str(sum([float(num) for num in target.split(',')]) / len(target.split(',')))
+    return sum([float(num) for num in target.split(',')]) / len(target.split(','))
 
 def median(target):
     """Returns the median of a list of numbers."""
@@ -545,7 +548,7 @@ def median(target):
     items.sort()
     if len(items) % 2 == 0:
         return str((items[len(items) // 2 - 1] + items[len(items) // 2]) / 2)
-    return str(items[len(items) // 2])
+    return items[len(items) // 2]
 
 def mode(target):
     """Returns the mode of a list of numbers."""
@@ -558,22 +561,22 @@ def mode(target):
         if count > max_count:
             max_count = count
             max_item = item
-    return str(max_item)
+    return max_item
 
 def min(target):
     """Returns the minimum of a list of numbers."""
     items = [float(num) for num in target.split(',')]
-    return str(min(items))
+    return min(items)
 
 def max(target):
     """Returns the maximum of a list of numbers."""
     items = [float(num) for num in target.split(',')]
-    return str(max(items))
+    return max(items)
 
 def sum(target):
     """Returns the sum of a list of numbers."""
     items = [float(num) for num in target.split(',')]
-    return str(sum(items))
+    return sum(items)
 
 def tarot(target=None):
     if target is None:
@@ -668,23 +671,23 @@ def swapcase(target):
 
 def isnumeric(target):
     """Checks if the input string is numeric."""
-    return str(target.isnumeric())
+    return target.isnumeric()
 
 def isalpha(target):
     """Checks if the input string contains only alphabetic characters."""
-    return str(target.isalpha())
+    return target.isalpha()
 
 def isalnum(target):
     """Checks if the input string contains only alphanumeric characters."""
-    return str(target.isalnum())
+    return target.isalnum()
 
 def ord(target):
     """Converts a character to its Unicode code point."""
-    return str(ord(target))
+    return ord(target)
 
 def chr(target):
     """Converts a Unicode code point to its corresponding character."""
-    return chr(int(target))
+    return int(target)
 
 def urlencode(target):
     """URL-encodes the input string."""
@@ -715,7 +718,14 @@ def unquote(target):
         return target[1:-1]
     return target
 
+def tetrad(target):
+    T = ["D", "H", "C", "V"]
+    if not target:
+        return T
+    return T[int(target) % 4]
+
+    
 
 # Gather all the tools in one place
 tools = {name: obj for name, obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj)}
-tools["builtin"] = tools
+tools["tools"] = tools
