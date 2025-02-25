@@ -9,7 +9,7 @@ def main():
     parser.add_argument("text", nargs='?', default="", help="Text with sigils.")
     parser.add_argument("--context", "-c", help="JSON/TOML file to provide context for interpolation.")
     parser.add_argument("--expression", "--expr", "-e", help="Wrap expression in %[sigils].")
-    parser.add_argument("--target", "-t", help="Target key in the context for interpolation.")
+    parser.add_argument("--index", "-i", help="A key used to narrow down the set of context values.")
     parser.add_argument("--max-depth", "-d", type=int, default=6, help="Maximum recursion depth.")
     parser.add_argument("--value", "-v", action='append', default=[], 
                         help='Additional context entries in the format KEY=VALUE. Can be used multiple times.')
@@ -18,6 +18,9 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="Seed for random number generation.")
     parser.add_argument("--dotenv", action='store_true', help="Load variables from a .env file.")
     parser.add_argument("--debug", action='store_true', help="Print debug output.")
+
+    # TODO: Add --infile (-i) for loading a template from a given filename
+    # TODO: Add --outfile (-o) for writing the output to a given filename 
 
     args = parser.parse_args()
     Sigil.debug = args.debug
@@ -56,8 +59,8 @@ def main():
         for entry in args.value:
             key, value = entry.split('=', 1)  # Split on the first '='
             context[key] = value
-        if args.target:
-            context = context.get(args.target)
+        if args.index:
+            context = context.get(args.index)
 
         if args.expression:
             args.text = f"{args.text}%[{args.expression}]"

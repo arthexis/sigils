@@ -1,5 +1,5 @@
 from .sigil import Sigil
+from .context import Context
 
-Context = Sigil.Context
 
 __all__ = ['Sigil', 'Context']

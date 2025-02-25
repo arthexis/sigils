@@ -724,6 +724,8 @@ def tetrad(target):
         return T
     return T[int(target) % 4]
 
+
+# TODO: Allow builtins to be loaded from other locations
     
 
 # Gather all the tools in one place

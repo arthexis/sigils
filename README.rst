@@ -14,6 +14,8 @@ You may also install optional dependencies:
 
     pip install sigils[dotenv]
     pip install sigils[toml]
+    pip install sigils[yaml]
+    pip install sigils[markdown]
     pip install sigils[all]  # Installs everything
 
 

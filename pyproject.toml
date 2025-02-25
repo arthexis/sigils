@@ -33,6 +33,8 @@ dependencies = [
 [project.optional-dependencies]
 dotenv = ["dotenv-python"]
 toml = ["toml"]
+yaml = ["pyyaml"]
+markdown = ["markdown"]
 all = ["dotenv-python", "toml"]
 
 [project.urls]

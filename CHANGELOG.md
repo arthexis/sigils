@@ -5,14 +5,16 @@ Release Notes
 -------------------
 
 New in this version:
+
 - The ARTHEXIS License
 - Expression mode for CLI (-e)
 - %[env.PATH] == %[PATH.env] (only True for env)
 - Removed slow debug logging
 
-In Roadmap:
+In Progress:
 
 - Proper configurable logging
+- Rework Context to be more flexible
 
 
 0.3.6 (2025-02-16)
