@@ -1,0 +1,14 @@
+# Core dependencies (currently empty, but can be updated in the future)
+# Install core package: pip install sigils
+
+# Optional dependencies for context processing
+dotenv-python  # For environment variable support
+toml  # For parsing TOML configuration files
+
+# Dependencies for optional tools
+ephem
+
+# To install with optional dependencies, use:
+# pip install sigils[dotenv]      # Install dotenv support
+# pip install sigils[toml]        # Install toml support
+# pip install sigils[all]         # Install all optional dependencies

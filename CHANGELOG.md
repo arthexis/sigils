@@ -1,6 +1,40 @@
 Release Notes
 =============
 
+0.3.7 (2025-02-27)
+-------------------
+
+New in this version:
+
+- The ARTHEXIS License
+- Expression mode for CLI (-e)
+- %[env.PATH] == %[PATH.env] (only True for env)
+- Removed slow debug logging
+
+In Progress:
+
+- Proper configurable logging
+- Rework Context to be more flexible
+
+
+0.3.6 (2025-02-16)
+-------------------
+
+Completed:
+
+- Fixed dependencies
+- Added builting tool to gather other tools
+- Improved benchmark
+- Allow negative array on indexes (TODO: Test)
+- Refactor sigil methods to leverage __init__
+
+In Roadmap:
+
+- Tests for loadenv
+- Better docs for included functions
+- Allow decimal numbers as keys
+
+
 0.3.6 (2023-07-19)
 -------------------
 
