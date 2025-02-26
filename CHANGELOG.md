@@ -8,6 +8,8 @@ Add the --field command line option to the sigil command.
 
 Refactor Sigil to split _resolve into "_resolve_map" and "_resolve_key".
 
+Allow sub-classing of Sigil for custom sigils?
+
 0.3.5 (2023-07-17)
 -------------------
 
