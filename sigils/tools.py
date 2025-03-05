@@ -127,39 +127,39 @@ def split(target, delimiter=',', separator=','):
     """Splits a string into a list. Returns the list separated by a delimiter (comma by default)."""
     return separator.join(target.split(delimiter))
 
-def month(target=None):
+def month(target):
     """Returns the name of a month from a month number or current month."""
-    if target is None:
+    if not target:
         return calendar.month_name[time.localtime().tm_mon]
     return calendar.month_name[int(target)]
 
-def day(target=None):
+def day(target):
     """Returns the name of a day from a day number or current day."""
-    if target is None:
+    if not target:
         return calendar.day_name[time.localtime().tm_wday]
     return calendar.day_name[int(target)]
 
-def year(target=None):
+def year(target):
     """Returns the current year or the year from a timestamp."""
-    if target is None:
+    if not target:
         return time.localtime().tm_year
     return time.localtime(int(target)).tm_year
 
-def date(target=None, format='%Y-%m-%d'):
+def date(target, format='%Y-%m-%d'):
     """Returns the current date or the date from a timestamp."""
-    if target is None:
+    if not target:
         return time.strftime(format)
     return time.strftime(format, time.localtime(int(target)))
 
-def time(target=None, format='%H:%M:%S'):
+def time(target, format='%H:%M:%S'):
     """Returns the current time or the time from a timestamp."""
-    if target is None:
+    if not target:
         return time.strftime(format)
     return time.strftime(format, time.localtime(int(target)))
 
-def zodiac(target=None):
+def zodiac(target):
     """Returns the zodiac sign for the current date or the date from a timestamp."""
-    if target is None:
+    if not target:
         month = time.localtime().tm_mon
         day = time.localtime().tm_mday
     else:
@@ -284,7 +284,7 @@ def html(target):
 def json(target, index=None):
     """Converts a JSON string to a Python dictionary."""
     import json
-    if target is None:
+    if not target:
         return json.loads(target)
     return json.loads(target)[index]
 
@@ -294,14 +294,14 @@ def toml(target, v=None):
         import toml
     except ImportError:
         import tomllib as toml
-    if target is None:
+    if not target:
         return toml.loads(target)
     return toml.loads(target)[index]
 
 def yaml(target, index=None):
     """Converts a YAML string to a Python dictionary."""
     import yaml
-    if target is None:
+    if not target:
         return yaml.safe_load(target)
     return yaml.safe_load(target)[index]
 
@@ -512,9 +512,9 @@ def sign(target):
     """Returns the sign of a number."""
     return float(target) / abs(float(target))
 
-def lunar(target=None):
+def lunar(target):
     """Returns the current lunar phase or the lunar phase from a timestamp."""
-    if target is None:
+    if not target:
         timestamp = time.time()
     else:
         timestamp = int(target)
@@ -578,8 +578,8 @@ def sum(target):
     items = [float(num) for num in target.split(',')]
     return sum(items)
 
-def tarot(target=None):
-    if target is None:
+def tarot(target):
+    if not target:
         num = random.randint(0, 77)
     else:
         num = int(target)
@@ -719,10 +719,27 @@ def unquote(target):
     return target
 
 def tetrad(target):
+    """Converts a number input into the tetradic system."""
     T = ["D", "H", "C", "V"]
     if not target:
         return T
     return T[int(target) % 4]
+
+def host(target):
+    """Returns the local hostname or looks up the hostname of a target host."""
+    import socket
+    if not target:
+        try:
+            local_hostname = socket.gethostname()
+            return local_hostname
+        except OSError as e:
+            return f"Error getting local hostname: {e}"
+    else:
+        try:
+            remote_hostname = socket.gethostbyname(target)
+            return remote_hostname
+        except socket.gaierror as e:
+            return f"Error looking up host '{target}': {e}"
 
 
 # TODO: Allow builtins to be loaded from other locations
