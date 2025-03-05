@@ -11,7 +11,7 @@ authors = [
 description = "Solve templates with %[sigils]."
 readme = "README.rst"
 requires-python = ">=3.9"
-keywords = ["utils", "sigils", "string", "text", "meta-text", "context"]
+keywords = ["utils", "sigils", "string", "text", "meta-text", "context", "template"]
 license = {text = "MIT"}
 classifiers = [
     'Development Status :: 3 - Alpha',

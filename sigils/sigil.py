@@ -98,8 +98,8 @@ class Sigil:
             value = context
             func_args = []
             for i, key in enumerate(keys):
-                if ':' in key:
-                    key_parts = key.split(':')
+                if ' ' in key:
+                    key_parts = key.split(' ')
                     key = key_parts[0]
                     func_args = key_parts[1:]
                 literal = False
@@ -157,15 +157,12 @@ class Sigil:
         return solved
 
     def results(self, context):
-        """
-        Returns a dictionary with all the sigils in the template and their solved values from the context.
+        """Returns a dictionary with all the sigils in the template and their solved values from the context.
         """
         return self._solve(context)
 
     def __mod__(self, context):
-        """
-        Operator overload for the modulus (%) operator. Same as interpolation method.
-        """
+        """Operator overload for the modulus (%) operator. Same as solve method."""
         result = self.solve(context or {})
         return result
 

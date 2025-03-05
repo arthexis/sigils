@@ -10,6 +10,8 @@ New in this version:
 - Expression mode for CLI (-e)
 - %[env.PATH] == %[PATH.env] (only True for env)
 - Removed slow debug logging
+- Replaced colon with spaces to call fuctions within sigils
+- Allow solving %[sigils] for an entire directory recursively
 
 In Progress:
 
