@@ -1,6 +1,7 @@
 import sys
 import random
 import argparse
+
 from sigils import Sigil
 
 
@@ -18,10 +19,9 @@ def main():
     parser.add_argument("--benchmark", action='store_true', help="Run benchmark.")
     parser.add_argument("--seed", type=int, default=None, help="Seed for random number generation.")
     parser.add_argument("--dotenv", action='store_true', help="Load variables from a .env file.")
-    parser.add_argument("--debug", action='store_true', help="Print debug output.")
+    parser.add_argument("--debug", "-b", action='store_true', help="Print debug output.")
 
-    # TODO: Add --infile (-i) for loading a template from a given filename
-    # TODO: Add --outfile (-o) for writing the output to a given filename 
+    # TODO: Add --write (-w) for writing the output to a given filename 
 
     args = parser.parse_args()
     Sigil.debug = args.debug
@@ -60,7 +60,7 @@ def main():
                         import toml
                     context = toml.load(f)
                 else:
-                    print(f"Unsupported file format: {context_file}", file=sys.stderr)
+                    print(f"Unsupported format: {context_file}", file=sys.stderr)
                     sys.exit(1)
         else:
             context = {}
@@ -74,7 +74,7 @@ def main():
         if args.expression:
             args.text = f"{args.text}%[{args.expression}]"
         sigil = Sigil(args.text)
-        result = sigil.interpolate(context)
+        result = sigil % context
         print(result)
 
 if __name__ == "__main__":
