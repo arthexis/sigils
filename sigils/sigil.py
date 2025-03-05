@@ -28,10 +28,6 @@ class Sigil:
             executable (bool, optional): Whether to executable callable values.
             max_depth (int, optional): Maximum depth for resolving sigils.
             debug (bool, optional): Enable debug logging.
-            on_error (str, optional): Error handling mechanism, one of:
-                raise - Re-raise the error (program may fail)
-                ignore - Supress the error (behave as unsolved sigil)
-                replace - Replace the sigil with the exception itself
         """
         self.template = template
 
@@ -52,15 +48,7 @@ class Sigil:
         """Solve the template with the provided context."""
         if context is None:
             context = Context.current_context
-        try:
-            solved = self._solve(context, 0)
-        except Exception as e:
-            if self.on_error == "raise":
-                raise e
-            elif self.on_error == "ignore":
-                return self.template
-            else:  # on_error == "replace"
-                return e
+        solved = self._solve(context, 0)
         parts = self.pattern.split(self.template)
         for i in range(1, len(parts), 2):
             value = solved.get(parts[i])
@@ -94,6 +82,7 @@ class Sigil:
     def _solve(self, context, depth=0):
         solved = {}
         for match in self.pattern.findall(self.template):
+            original = str(match)
             keys = match.split('.')
             value = context
             func_args = []
@@ -133,7 +122,7 @@ class Sigil:
                 if temp is not None:
                     value = temp
                 else:
-                    value = None
+                    value = original
                     break
             if value is not None:
                 solved[match] = value

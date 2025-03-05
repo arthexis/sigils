@@ -23,31 +23,31 @@ class TestSigil(unittest.TestCase):
             "AGE": 40,      # Upper case key
         }
 
-    def test_custom_debug_true(self):
+    def test_custom_debug_true_flag_gets_set(self):
         s = Sigil("Hello, %[name]!", debug=True)
         self.assertTrue(s.debug)  
 
-    def test_custom_debug_false(self):
+    def test_custom_debug_false_flag_gets_unset(self):
         s = Sigil("Hello, %[name]!", debug=False)
         self.assertFalse(s.debug)  
 
-    def test_interpolation(self):
+    def test_basic_solve(self):
         s = Sigil("Hello, %[name]!")
         self.assertEqual(s % self.context, "Hello, Alice!")
 
-    def test_nested_interpolation(self):
+    def test_nested_solve(self):
         s = Sigil("Hello, %[nested.key]!")
         self.assertEqual(s % self.context, "Hello, value!")
 
-    def test_list_interpolation(self):
+    def test_list_solve(self):
         s = Sigil("Number: %[list.1]")
         self.assertEqual(s % self.context, "Number: 2")
 
-    def test_callable_interpolation(self):
+    def test_callable_solve(self):
         s = Sigil("%[callable]")
         self.assertEqual(s % self.context, "Hello, World!")
 
-    def test_callable_with_args_interpolation(self):
+    def test_callable_with_args_solve(self):
         s = Sigil("%[callable_with_args name]")
         self.assertEqual(s % self.context, "Hello, Alice!")
 
@@ -55,18 +55,22 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[callable_with_args %name]")
         self.assertEqual(s % self.context, "Hello, name!")
 
+    def test_literal_on_unsolved_just_removes_brackets(self):
+        s = Sigil("%[notfound]")
+        self.assertEqual(s % self.context, "notfound")
+
     def test_sigil_results(self):
         s = Sigil("Hello, %[name]!")
         self.assertEqual(s.results(self.context), {"name": "Alice"})
 
-    def test_recursive_interpolation(self):
+    def test_recursive_solve(self):
         self.context["a"] = "%[b]"
         self.context["b"] = "%[c]"
         self.context["c"] = "Hello, World!"
         s = Sigil("%[a]")
         self.assertEqual(s % self.context, "Hello, World!")
 
-    def test_list_of_dictionaries_interpolation(self):
+    def test_list_of_dictionaries_solve(self):
         self.context["users"] = [
             {"name": "Alice", "email": "alice@example.com"},
             {"name": "Bob", "email": "bob@example.com"}
@@ -74,7 +78,7 @@ class TestSigil(unittest.TestCase):
         s = Sigil("User: %[users.0.name], Email: %[users.0.email]")
         self.assertEqual(s % self.context, "User: Alice, Email: alice@example.com")
 
-    def test_nested_callable_with_args_interpolation(self):
+    def test_nested_callable_with_args_solve(self):
         self.context['nested']['callable_with_args'] = lambda x: f"Hello, {x}!"
         s = Sigil("Message: %[nested.callable_with_args name]")
         self.assertEqual(s % self.context, "Message: Hello, Alice!")
@@ -98,15 +102,15 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[name.reverse]")
         self.assertEqual(s % self.context, "ecilA")
 
-    def test_case_insensitive_interpolation(self):
+    def test_case_insensitive_solve(self):
         s = Sigil("Hello, %[Name]!")
         self.assertEqual(s % self.context, "Hello, Bob!")
 
-    def test_case_insensitive_interpolation_lowercase(self):
+    def test_case_insensitive_solve_lowercase(self):
         s = Sigil("Age: %[age]")
         self.assertEqual(s % self.context, "Age: 30")
 
-    def test_case_insensitive_interpolation_uppercase(self):
+    def test_case_insensitive_solve_uppercase(self):
         s = Sigil("Age: %[AGE]")
         self.assertEqual(s % self.context, "Age: 40")
 
@@ -114,7 +118,7 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[n.tarot]")
         self.assertEqual(s % {'n': '12'}, "The Hanged Man")
 
-    def test_env_interpolation(self):
+    def test_env_solve(self):
         os.environ["TEST_ENV_VAR"] = "Hello, Environment!"
         s = Sigil("%[env TEST_ENV_VAR]")
         self.assertEqual(s % self.context, "Hello, Environment!")
