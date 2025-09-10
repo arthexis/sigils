@@ -108,7 +108,7 @@ def main():
             process_file(args.file, output_path, context, args.debug)
     else:
         text = args.text if not args.expression else f"{args.text}%[{args.expression}]"
-        result = Sigil(text, debug=debug) % context
+        result = Sigil(text, debug=args.debug) % context
         print(result)
     
     

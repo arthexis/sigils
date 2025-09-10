@@ -1,5 +1,12 @@
 import os
+import sys
+import json
+import tempfile
 import unittest
+import io
+from contextlib import redirect_stdout
+from unittest.mock import patch
+
 from sigils import Sigil
 
 
@@ -29,7 +36,15 @@ class TestSigil(unittest.TestCase):
 
     def test_custom_debug_false_flag_gets_unset(self):
         s = Sigil("Hello, %[name]!", debug=False)
-        self.assertFalse(s.debug)  
+        self.assertFalse(s.debug)
+
+    def test_custom_executable_flag_gets_set(self):
+        s = Sigil("Hello, %[name]!", executable=False)
+        self.assertFalse(s.executable)
+
+    def test_custom_brackets_gets_set(self):
+        s = Sigil("Hello, %{name}", brackets=["%{", "}"])
+        self.assertEqual(s.brackets, ["%{", "}"])
 
     def test_basic_solve(self):
         s = Sigil("Hello, %[name]!")
@@ -133,6 +148,24 @@ class TestSigil(unittest.TestCase):
         # Keep at least one example, since this is the most common use case
         s = Sigil("Hello!")
         self.assertEqual(s % None, "Hello!")
+
+    def test_cli_main_runs(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump({"name": "Alice"}, tmp)
+            tmp.flush()
+            args = [
+                "sigils",
+                "Hello, %[name]!",
+                "--context",
+                tmp.name,
+            ]
+            with patch.object(sys, "argv", args):
+                with io.StringIO() as buf, redirect_stdout(buf):
+                    from sigils.__main__ import main
+                    main()
+                    output = buf.getvalue().strip()
+        os.unlink(tmp.name)
+        self.assertEqual(output, "Hello, Alice!")
 
 if __name__ == "__main__":
     unittest.main()

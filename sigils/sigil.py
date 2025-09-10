@@ -32,8 +32,8 @@ class Sigil:
         self.template = template
 
         # Use instance-specific values or fall back to class defaults
-        self.executable = executable if brackets is not None else self.__class__.executable
-        self.brackets = brackets if executable is not None else self.__class__.brackets
+        self.executable = executable if executable is not None else self.__class__.executable
+        self.brackets = brackets if brackets is not None else self.__class__.brackets
         self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
         self.debug = debug if debug is not None else self.__class__.debug
         self.on_error = on_error if on_error is not None else self.__class__.on_error
