@@ -35,6 +35,10 @@ class TestSigil(unittest.TestCase):
         s = Sigil("Hello, %[name]!")
         self.assertEqual(s % self.context, "Hello, Alice!")
 
+    def test_basic_solve_without_percent(self):
+        s = Sigil("Hello, [name]!")
+        self.assertEqual(s % self.context, "Hello, Alice!")
+
     def test_nested_solve(self):
         s = Sigil("Hello, %[nested.key]!")
         self.assertEqual(s % self.context, "Hello, value!")

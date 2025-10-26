@@ -41,7 +41,7 @@ class Sigil:
         self.pattern = getattr(self._cache, 'value', {}).get(template)
         if self.pattern is None:
             # TODO: Use self.brackets, but first sanitize it for re compatibility
-            self.pattern = re.compile(r'%\[(.*?)\]')
+            self.pattern = re.compile(r'(?P<prefix>%?)\[(?P<content>.*?)\]')
             self._cache.value = {template: self.pattern}
 
     def solve(self, context):
@@ -49,18 +49,26 @@ class Sigil:
         if context is None:
             context = Context.current_context
         solved = self._solve(context, 0)
-        parts = self.pattern.split(self.template)
-        for i in range(1, len(parts), 2):
-            value = solved.get(parts[i])
+        result_parts = []
+        last_end = 0
+        for match in self.pattern.finditer(self.template):
+            start, end = match.span()
+            result_parts.append(self.template[last_end:start])
+            key = match.group('content')
+            value = solved.get(key)
             if isinstance(value, dict):
                 if "value" in value:
-                    parts[i] = value["value"]
+                    replacement = value["value"]
                 else:
-                    parts[i] = "|".join(value.keys())
+                    replacement = "|".join(value.keys())
+            elif value is not None:
+                replacement = str(value)
             else:
-                parts[i] = str(value) if value is not None else f'%[{parts[i]}]'
-        result = ''.join(parts)
-        return result
+                replacement = match.group(0)
+            result_parts.append(replacement)
+            last_end = end
+        result_parts.append(self.template[last_end:])
+        return ''.join(result_parts)
 
     def _run_function(self, func, func_args, value, context):
         num_args = func.__code__.co_argcount
@@ -81,9 +89,9 @@ class Sigil:
 
     def _solve(self, context, depth=0):
         solved = {}
-        for match in self.pattern.findall(self.template):
-            original = str(match)
-            keys = match.split('.')
+        for match in self.pattern.finditer(self.template):
+            original = match.group('content')
+            keys = original.split('.')
             value = context
             func_args = []
             for i, key in enumerate(keys):
@@ -125,12 +133,12 @@ class Sigil:
                     value = original
                     break
             if value is not None:
-                solved[match] = value
+                solved[original] = value
             else:
                 global_context = getattr(Context._context, 'value', {})
-                value = global_context.get(match.replace('-', '_'), None)
+                value = global_context.get(original.replace('-', '_'), None)
                 if value is not None:
-                    solved[match] = value
+                    solved[original] = value
         if depth < self.max_depth:
             for key, value in list(solved.items()):
                 if isinstance(value, str) and '%' in value:
