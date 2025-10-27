@@ -55,6 +55,12 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[callable_with_args %name]")
         self.assertEqual(s % self.context, "Hello, name!")
 
+    def test_optional_percent_delimiters(self):
+        self.assertEqual(Sigil("[name]") % self.context, "Alice")
+        self.assertEqual(Sigil("%[name]") % self.context, "Alice")
+        self.assertEqual(Sigil("[name]%") % self.context, "Alice")
+        self.assertEqual(Sigil("%[name]%") % self.context, "Alice")
+
     def test_literal_on_unsolved_just_removes_brackets(self):
         s = Sigil("%[notfound]")
         self.assertEqual(s % self.context, "notfound")

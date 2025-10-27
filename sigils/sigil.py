@@ -29,7 +29,7 @@ class Sigil:
 
         self.pattern = getattr(self.cache, 'value', {}).get(template)
         if self.pattern is None:
-            self.pattern = re.compile(r'%\[(.*?)\]')
+            self.pattern = re.compile(r'%?\[(.*?)\]%?')
             self.cache.value = {template: self.pattern}
 
     def solve(self, context=None, sep="|"):
