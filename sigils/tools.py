@@ -1,5 +1,5 @@
 import os
-import time
+import time as _time
 import calendar
 import random
 import hashlib
@@ -105,18 +105,13 @@ def env(x):
 def epoch(x):
     """Return server time in seconds since the epoch."""
     if x:
-        return time.time() - int(x)
-    return time.time()
+        return _time.time() - int(x)
+    return _time.time()
 
 # Wrap the input in a %[sigil]
 def sigil(x, start='%[', end=']'):
     """Wraps a string in a sigil, or any other string."""
     return f"{start}{x}{end}"
-
-# List available sigils (one level deep), separated by a comma
-def sigils(x):
-    """Returns a comma-separated list of available sigils."""
-    return ','.join([f"%[{key}]" for key in Sigil(x).sigils()])
 
 # Treat as a list separated by a delimiter (Comma by default) and get the nth item
 def nth(x, n, delimiter=','):
@@ -130,41 +125,41 @@ def split(x, delimiter=',', separator=','):
 def month(x):
     """Returns the name of a month from a month number or current month."""
     if not x:
-        return calendar.month_name[time.localtime().tm_mon]
+        return calendar.month_name[_time.localtime().tm_mon]
     return calendar.month_name[int(x)]
 
 def day(x):
     """Returns the name of a day from a day number or current day."""
     if not x:
-        return calendar.day_name[time.localtime().tm_wday]
+        return calendar.day_name[_time.localtime().tm_wday]
     return calendar.day_name[int(x)]
 
 def year(x):
     """Returns the current year or the year from a timestamp."""
     if not x:
-        return time.localtime().tm_year
-    return time.localtime(int(x)).tm_year
+        return _time.localtime().tm_year
+    return _time.localtime(int(x)).tm_year
 
-def date(x, format='%Y-%m-%d'):
+def date(x, fmt='%Y-%m-%d'):
     """Returns the current date or the date from a timestamp."""
     if not x:
-        return time.strftime(format)
-    return time.strftime(format, time.localtime(int(x)))
+        return _time.strftime(fmt)
+    return _time.strftime(fmt, _time.localtime(int(x)))
 
-def time(x, format='%H:%M:%S'):
+def time(x, fmt='%H:%M:%S'):
     """Returns the current time or the time from a timestamp."""
     if not x:
-        return time.strftime(format)
-    return time.strftime(format, time.localtime(int(x)))
+        return _time.strftime(fmt)
+    return _time.strftime(fmt, _time.localtime(int(x)))
 
 def zodiac(x):
     """Returns the zodiac sign for the current date or the date from a timestamp."""
     if not x:
-        month = time.localtime().tm_mon
-        day = time.localtime().tm_mday
+        month = _time.localtime().tm_mon
+        day = _time.localtime().tm_mday
     else:
-        month = time.localtime(int(x)).tm_mon
-        day = time.localtime(int(x)).tm_mday
+        month = _time.localtime(int(x)).tm_mon
+        day = _time.localtime(int(x)).tm_mday
     if (month == 12 and day >= 22) or (month == 1 and day <= 19):
         return "Capricorn"
     elif (month == 1 and day >= 20) or (month == 2 and day <= 17):
@@ -195,8 +190,8 @@ def zodiac(x):
 def weekday(x):
     """Returns the weekday for the current date or the date from a timestamp."""
     if not x:
-        return calendar.day_name[time.localtime().tm_wday]
-    return calendar.day_name[time.localtime(int(x)).tm_wday]
+        return calendar.day_name[_time.localtime().tm_wday]
+    return calendar.day_name[_time.localtime(int(x)).tm_wday]
 
 def rand(x):
     """Returns a random number between 0 and 1."""
@@ -515,7 +510,7 @@ def sign(x):
 def lunar(x):
     """Returns the current lunar phase or the lunar phase from a timestamp."""
     if not x:
-        timestamp = time.time()
+        timestamp = _time.time()
     else:
         timestamp = int(x)
     import ephem
@@ -728,7 +723,7 @@ def tetrad(x):
 def host(x):
     """Returns the local hostname or looks up the hostname of a host."""
     import socket
-    if not x:
+    if not x or not isinstance(x, str):
         try:
             local_hostname = socket.gethostname()
             return local_hostname

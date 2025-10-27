@@ -6,48 +6,34 @@ from .context import Context
 
 
 class Sigil:
-    _cache = threading.local()
+    cache = threading.local()
 
     # Default settings at the class level
-    
-    # TODO: Allow left and right brackets to be configurable
-    brackets = ["%[", "]"]
-
-    executable = True
     max_depth = 6
     debug = False
-    on_error = "raise"
 
-    def __init__(self, template, *,
-        executable=None, brackets=None, max_depth=None, debug=None, on_error=None):
+    def __init__(self, template, *, max_depth=None, debug=None):
         """
         Initialize a new Sigil instance.
 
         Args:
             template (str): The template string.
-            executable (bool, optional): Whether to executable callable values.
             max_depth (int, optional): Maximum depth for resolving sigils.
             debug (bool, optional): Enable debug logging.
         """
         self.template = template
 
         # Use instance-specific values or fall back to class defaults
-        self.executable = executable if brackets is not None else self.__class__.executable
-        self.brackets = brackets if executable is not None else self.__class__.brackets
         self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
         self.debug = debug if debug is not None else self.__class__.debug
-        self.on_error = on_error if on_error is not None else self.__class__.on_error
 
-        self.pattern = getattr(self._cache, 'value', {}).get(template)
+        self.pattern = getattr(self.cache, 'value', {}).get(template)
         if self.pattern is None:
-            # TODO: Use self.brackets, but first sanitize it for re compatibility
             self.pattern = re.compile(r'%\[(.*?)\]')
-            self._cache.value = {template: self.pattern}
+            self.cache.value = {template: self.pattern}
 
-    def solve(self, context):
+    def solve(self, context=None, sep="|"):
         """Solve the template with the provided context."""
-        if context is None:
-            context = Context.current_context
         solved = self._solve(context, 0)
         parts = self.pattern.split(self.template)
         for i in range(1, len(parts), 2):
@@ -56,13 +42,13 @@ class Sigil:
                 if "value" in value:
                     parts[i] = value["value"]
                 else:
-                    parts[i] = "|".join(value.keys())
+                    parts[i] = sep.join(value.keys())
             else:
                 parts[i] = str(value) if value is not None else f'%[{parts[i]}]'
         result = ''.join(parts)
         return result
 
-    def _run_function(self, func, func_args, value, context):
+    def _run_func(self, func, func_args, value, context):
         num_args = func.__code__.co_argcount
         if func_args:
             solved_args = [Sigil(f'%[{arg}]').solve(context) for arg in func_args]
@@ -77,11 +63,12 @@ class Sigil:
             if num_args == 1:
                 return func(value)
             else:
-                return func()
+                return func(None)
 
     def _solve(self, context, depth=0):
         solved = {}
         for match in self.pattern.findall(self.template):
+            temp = None
             original = str(match)
             keys = match.split('.')
             value = context
@@ -100,13 +87,17 @@ class Sigil:
                 elif value and isinstance(value, dict) and key in value:
                     temp = value.get(key, None)
                     if callable(temp):
-                        temp = self._run_function(temp, func_args, value, context)
+                        temp = self._run_func(temp, func_args, value, context)
+                        if temp is None:
+                            temp = key
                 elif value and isinstance(value, list) and key.lstrip("+-").isdigit():
                     temp = value[int(key)]
                 elif key in tools:
                     tool_func = tools[key]
                     if callable(tool_func):
-                        temp = self._run_function(tool_func, func_args, value, context)
+                        temp = self._run_func(tool_func, func_args, value, context)
+                        if temp is None:
+                            temp = key
                     else:
                         temp = tool_func
                 else:
@@ -127,7 +118,7 @@ class Sigil:
             if value is not None:
                 solved[match] = value
             else:
-                global_context = getattr(Context._context, 'value', {})
+                global_context = getattr(Context.local, 'value', {})
                 value = global_context.get(match.replace('-', '_'), None)
                 if value is not None:
                     solved[match] = value

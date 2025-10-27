@@ -6,7 +6,10 @@ def run_benchmark(*, n=10000, debug=False):
     complex_context = {
         "user": {
             "name": "Alice",
-            "friends": [{"name": "Bob"}, {"name": "Charlie"}, {"name": "Dave"}],
+            "friends": [
+                {"name": "Bob"}, {"name": "Charlie"}, {"name": "Dave"},
+                {"name": "Gunther"}, {"name": "Karla"}, {"name": "Monica"}
+            ],
             "greet": lambda name: f"Hello, {name}!"
         },
         "numbers": list(range(1000))
@@ -15,9 +18,10 @@ def run_benchmark(*, n=10000, debug=False):
     # Define the templates
     complex_template = """
         Hello, %[user.name]! You have %[user.friends.length] friends. 
-        Your first friend is %[user.friends.0.name]. Number 500 is %[numbers.500].
-        Your friends are: %[user.friends.0.name], %[user.friends.1.name], %[user.friends.2.name].
+        Your first friend is %[user.friends.0.name]. I hope 500 is %[numbers.500] (sanity check).
+        Your first three friends are %[user.friends.0], %[user.friends.1.name], %[user.friends.2.name].
         Your last friend was %[user.friends.-1.name]. Second to last was %[user.friends.-2.name].
+        Running from %[host] on %[date].
 
     """
 

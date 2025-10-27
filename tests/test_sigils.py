@@ -59,7 +59,7 @@ class TestSigil(unittest.TestCase):
         s = Sigil("%[notfound]")
         self.assertEqual(s % self.context, "notfound")
 
-    def test_sigil_results(self):
+    def test_sigil_results_method(self):
         s = Sigil("Hello, %[name]!")
         self.assertEqual(s.results(self.context), {"name": "Alice"})
 
