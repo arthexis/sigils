@@ -1,30 +1,52 @@
 [build-system]
-requires = [ "setuptools", "setuptools-scm",]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigils"
 version = "0.3.9"
-description = "Solve templates with %[sigils]."
+description = "Solve templates with [sigils]."
 readme = "README.rst"
 requires-python = ">=3.9"
-keywords = [ "utils", "sigils", "string", "text", "meta-text", "context", "template",]
-classifiers = [ "Development Status :: 3 - Alpha", "Intended Audience :: Developers", "Topic :: Software Development :: Libraries", "Topic :: Text Processing :: Markup", "Topic :: Software Development :: Pre-processors", "Topic :: Internet :: WWW/HTTP :: Dynamic Content", "Environment :: Console", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11",]
-dependencies = []
+license = {file = "LICENSE"}
+keywords = ["utils", "sigils", "string", "text", "meta-text", "context", "template"]
+dependencies = [
+    "tomli>=2.0; python_version < '3.11'",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing :: Markup",
+    "Topic :: Software Development :: Pre-processors",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
 [[project.authors]]
 name = "Rafael Jesús Guillén Osorio"
 email = "arthexis@gmail.com"
 
-[project.license]
-text = "MIT"
-
 [project.optional-dependencies]
-dotenv = [ "dotenv-python",]
-toml = [ "toml",]
-yaml = [ "pyyaml",]
-markdown = [ "markdown",]
-build = [ "build",]
-all = [ "dotenv-python", "toml", "yaml", "markdown", "build",]
+dotenv = ["dotenv-python"]
+toml = ["tomli>=2.0; python_version < '3.11'"]
+yaml = ["pyyaml"]
+markdown = ["markdown"]
+astronomy = ["ephem"]
+build = ["build"]
+all = [
+    "dotenv-python",
+    "pyyaml",
+    "markdown",
+    "ephem",
+    "build",
+]
 
 [project.urls]
 Source = "https://github.com/arthexis/sigils"
