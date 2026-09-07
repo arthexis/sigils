@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+0.4.1 (2026-09-07)
+-------------------
+
+- Replaced the historical built-in tool module plus import-time override shim
+  with one explicit canonical tool registry while retaining the legacy tool
+  names used by Sigils expressions.
+- Removed undocumented benchmark, make, and package-release helpers from the
+  installed runtime package; CI and the GitHub release workflow now own those
+  development concerns.
+- Removed Ruff exclusions and expanded the shared ``ci-base`` quality gate to
+  the package, tests, and repository validator.
+- Added the missing ``ci-base`` v1 compatibility marker and kept the repository
+  aligned with the shared v1 consumer baseline.
+
+
 0.4.0 (2026-09-07)
 -------------------
 
