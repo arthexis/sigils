@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-0.3.9 (2026-09-07)
+0.4.0 (2026-09-07)
 -------------------
 
 - Made ``[...]`` the canonical lazy sigil syntax and reserved ``%[...]`` for
@@ -17,6 +17,8 @@ Release Notes
   Python versions without ``tomllib``.
 - Reconciled optional dependencies, package metadata, documentation, and the
   ARTHEXIS License declaration.
+- Promoted the stabilized post-#20/#21 baseline from the unreleased 0.3.9
+  development version to 0.4.0.
 
 
 0.3.7 (2025-02-27)
