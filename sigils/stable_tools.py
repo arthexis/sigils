@@ -99,9 +99,7 @@ def _environment_allowlist():
     """Return default public environment names plus caller-approved additions."""
     configured = os.environ.get("SIGILS_ENV_ALLOWLIST", "")
     additional = {
-        item.strip().upper()
-        for item in configured.split(",")
-        if item.strip()
+        item.strip().upper() for item in configured.split(",") if item.strip()
     }
     return DEFAULT_ENV_ALLOWLIST | additional
 
@@ -115,9 +113,7 @@ def env(value):
     allowlist = _environment_allowlist()
     if not value:
         return {
-            key: item
-            for key, item in os.environ.items()
-            if key.upper() in allowlist
+            key: item for key, item in os.environ.items() if key.upper() in allowlist
         }
 
     name = str(value).upper()
