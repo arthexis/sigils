@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+0.4.2 (2026-09-07)
+-------------------
+
+- Renamed the PyPI distribution from ``sigils`` to ``gway-sigils`` so current
+  releases can be published from the active project account without depending
+  on the inaccessible historical PyPI project.
+- Kept the Python import namespace and CLI unchanged: ``import sigils`` and the
+  ``sigils`` executable remain the public runtime interface.
+- Updated trusted-publishing metadata for the new ``gway-sigils`` distribution.
+
+
 0.4.1 (2026-09-07)
 -------------------
 
