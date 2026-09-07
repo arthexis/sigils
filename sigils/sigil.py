@@ -27,7 +27,9 @@ class Sigil:
         """
         self._captured_secrets = {}
         self._template = str(template)
-        self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
+        self.max_depth = (
+            max_depth if max_depth is not None else self.__class__.max_depth
+        )
         self.debug = debug if debug is not None else self.__class__.debug
 
         self.pattern = re.compile(r"(?P<eager>%)?\[(?P<expression>.*?)\]")
@@ -91,7 +93,9 @@ class Sigil:
             rendered = rendered.replace(marker, replacement)
         return rendered
 
-    def _render_template(self, template, context, *, sep="|", depth=0, eager_only=False):
+    def _render_template(
+        self, template, context, *, sep="|", depth=0, eager_only=False
+    ):
         """Render matching sigils in *template* using the requested resolution phase."""
         if depth > self.max_depth:
             return template
