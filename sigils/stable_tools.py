@@ -17,26 +17,29 @@ except ModuleNotFoundError:  # Python 3.9 and 3.10
     import tomli as _tomllib
 
 
-FORBIDDEN_ENV = (
-    "DATABASE",
-    "KEY",
-    "SECRET",
-    "ACCESS_TOKEN",
-    "AWS",
-    "SSH",
-    "OAUTH",
-    "SMTP",
-    "CREDENTIALS",
-    "ENV_FILE",
-    "SESSION",
+DEFAULT_ENV_ALLOWLIST = frozenset(
+    {
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "PWD",
+        "SHELL",
+        "TERM",
+        "TZ",
+        "USER",
+        "USERNAME",
+    }
 )
 
 
 def _numbers(value):
+    """Parse a comma-separated value into floating-point numbers."""
     return [float(number) for number in str(value).split(",")]
 
 
 def _select(value, index):
+    """Return *value* unchanged or select one item when *index* is provided."""
     return value if index is None else value[index]
 
 
@@ -96,22 +99,33 @@ def markdown(value):
     return _markdown.markdown(value)
 
 
-def _forbidden_env(name):
-    upper_name = name.upper()
-    return any(marker in upper_name for marker in FORBIDDEN_ENV)
+def _environment_allowlist():
+    """Return default public environment names plus caller-approved additions."""
+    configured = os.environ.get("SIGILS_ENV_ALLOWLIST", "")
+    additional = {
+        item.strip().upper()
+        for item in configured.split(",")
+        if item.strip()
+    }
+    return DEFAULT_ENV_ALLOWLIST | additional
 
 
 def env(value):
-    """Return a non-sensitive environment value or filtered environment map."""
+    """Return only explicitly allowlisted environment values.
+
+    ``SIGILS_ENV_ALLOWLIST`` may contain a comma-separated list of additional
+    names that the embedding process explicitly considers safe to expose.
+    """
+    allowlist = _environment_allowlist()
     if not value:
         return {
             key: item
             for key, item in os.environ.items()
-            if not _forbidden_env(key)
+            if key.upper() in allowlist
         }
 
     name = str(value).upper()
-    if _forbidden_env(name):
+    if name not in allowlist:
         return ""
     return os.environ.get(name)
 
