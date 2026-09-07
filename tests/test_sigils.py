@@ -49,14 +49,14 @@ class TestSigil(unittest.TestCase):
 
     def test_lazy_sigil_does_not_resolve_on_construction(self):
         """Keep lazy sigils intact until explicitly solved."""
-        name = "Ambient Alice"
+        name = "Ambient Alice"  # noqa: F841 - intentionally visible to inspect()
         s = Sigil("[name]")
         self.assertEqual(s.template, "[name]")
         self.assertEqual(s.solve({"name": "Explicit Bob"}), "Explicit Bob")
 
     def test_eager_sigil_resolves_local_on_construction(self):
         """Resolve eager sigils from caller locals during construction."""
-        name = "Ambient Alice"
+        name = "Ambient Alice"  # noqa: F841 - intentionally visible to inspect()
         s = Sigil("%[name]")
         self.assertEqual(s.template, "Ambient Alice")
         self.assertEqual(s.solve({"name": "Explicit Bob"}), "Ambient Alice")
@@ -74,7 +74,7 @@ class TestSigil(unittest.TestCase):
 
     def test_eager_context_precedence_prefers_local_over_global_and_context(self):
         """Prefer caller locals over globals and active Context values."""
-        AMBIENT_PRECEDENCE = "local"
+        AMBIENT_PRECEDENCE = "local"  # noqa: F841 - ambient resolver fixture
         with Context({"AMBIENT_PRECEDENCE": "context"}):
             s = Sigil("%[AMBIENT_PRECEDENCE]")
         self.assertEqual(s.template, "local")
@@ -90,22 +90,24 @@ class TestSigil(unittest.TestCase):
 
     def test_eager_and_lazy_sigils_can_coexist(self):
         """Support early-bound and late-bound placeholders in one template."""
-        early = "captured now"
+        early = "captured now"  # noqa: F841 - ambient resolver fixture
         s = Sigil("%[early] [late]")
         self.assertEqual(s.template, "captured now [late]")
-        self.assertEqual(s.solve({"late": "resolved later"}), "captured now resolved later")
+        self.assertEqual(
+            s.solve({"late": "resolved later"}), "captured now resolved later"
+        )
 
     def test_eager_recursive_resolution_preserves_lazy_tokens(self):
         """Keep lazy tokens produced during the eager phase unresolved."""
-        early = "[late]"
+        early = "[late]"  # noqa: F841 - ambient resolver fixture
         s = Sigil("%[early]")
         self.assertEqual(s.template, "[late]")
         self.assertEqual(s.solve({"late": "resolved later"}), "resolved later")
 
     def test_eager_recursive_resolution_continues_through_eager_tokens(self):
         """Continue recursive eager resolution through eager token values."""
-        first = "%[second]"
-        second = "resolved now"
+        first = "%[second]"  # noqa: F841 - ambient resolver fixture
+        second = "resolved now"  # noqa: F841 - ambient resolver fixture
         s = Sigil("%[first]")
         self.assertEqual(s.template, "resolved now")
 
