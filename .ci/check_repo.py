@@ -36,7 +36,9 @@ def _check_pyproject(root: Path) -> CheckResult:
             "missing project field(s): " + ", ".join(missing),
         )
 
-    return CheckResult("pyproject", True, f"project={project['name']} version={project['version']}")
+    return CheckResult(
+        "pyproject", True, f"project={project['name']} version={project['version']}"
+    )
 
 
 def _check_tests(root: Path) -> CheckResult:
@@ -70,7 +72,9 @@ def check_repo(root: Path, *, require_python_project: bool = True) -> list[Check
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate baseline repository structure.")
+    parser = argparse.ArgumentParser(
+        description="Validate baseline repository structure."
+    )
     parser.add_argument("path", nargs="?", default=".", help="repository root")
     parser.add_argument(
         "--template",
