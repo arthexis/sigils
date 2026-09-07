@@ -255,6 +255,52 @@ benchmark, test-runner, make, and package-release switches are development
 concerns and are no longer exposed as public CLI flags.
 
 
+Protected values
+================
+
+``Secret`` marks a value as sensitive without changing sigil syntax. It is a
+redaction and taint-propagation primitive, not encryption.
+
+.. code-block:: python
+
+    from sigils import Secret, Sigil
+
+    password = Secret("swordfish")
+
+    print(password)       # [REDACTED]
+    print(repr(password)) # Secret('[REDACTED]')
+    print(password.reveal())  # swordfish -- explicit trusted access
+
+    template = Sigil("password=[password]")
+    context = {"password": password}
+
+    print(template.solve(context))
+    # password=swordfish
+
+    print(template.results(context))
+    # {'password': '[REDACTED]'}
+
+Template rendering is an intentional output operation, so it can consume the
+real wrapped value. Resolver introspection through ``results()`` recursively
+redacts protected values instead. Dotted traversal, built-in tools, callable
+arguments, and recursive interpolation preserve the protection marker.
+
+Eager protected values are captured out-of-band instead of storing their raw
+text in the template:
+
+.. code-block:: python
+
+    password = Secret("swordfish")
+    template = Sigil("password=%[password]")
+
+    print(template.template)  # password=[REDACTED]
+    print(template.solve())   # password=swordfish
+
+Use ``reveal()`` only at an explicit trusted boundary. ``Secret`` does not stop
+code that deliberately unwraps or renders the value; its purpose is to prevent
+accidental disclosure through ordinary representations and introspection.
+
+
 Considerations
 ==============
 
@@ -276,17 +322,3 @@ Considerations
   ``SIGILS_ENV_ALLOWLIST`` environment variable. Unapproved names return an
   empty string, and requesting the complete environment returns only approved
   entries.
-
-
-Performance
-===========
-
-Sigils is designed with performance in mind. In typical use cases, Sigils
-performs competitively with Python's built-in string formatting.
-
-
-License
-=======
-
-Sigils is distributed under the ARTHEXIS License. See ``LICENSE`` for the full
-terms.
