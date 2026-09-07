@@ -282,12 +282,7 @@ def script(value, script):
 
 
 def html(value):
-    return (
-        str(value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _select(value, index):
@@ -394,7 +389,9 @@ def polybius(value):
         for index, character in enumerate(alphabet)
     }
     positions["J"] = positions["I"]
-    return "".join(positions.get(character.upper(), character) for character in str(value))
+    return "".join(
+        positions.get(character.upper(), character) for character in str(value)
+    )
 
 
 def rot13(value):
@@ -440,7 +437,9 @@ _MORSE = {
 
 
 def morse(value):
-    return " ".join(_MORSE.get(character.upper(), character) for character in str(value))
+    return " ".join(
+        _MORSE.get(character.upper(), character) for character in str(value)
+    )
 
 
 def log(value):
