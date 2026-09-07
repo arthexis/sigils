@@ -25,7 +25,9 @@ class SafeNamespace:
     __slots__ = ("_source",)
 
     def __init__(self, source: Mapping[str, object] | NamespaceProvider) -> None:
-        if not isinstance(source, Mapping) and not isinstance(source, NamespaceProvider):
+        if not isinstance(source, Mapping) and not isinstance(
+            source, NamespaceProvider
+        ):
             raise TypeError(
                 "SafeNamespace source must be a mapping or NamespaceProvider"
             )
