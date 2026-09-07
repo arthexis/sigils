@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.3.9"
 description = "Solve templates with [sigils]."
 readme = "README.rst"
 requires-python = ">=3.9"
-license = {file = "LICENSE"}
+license = "LicenseRef-ARTHEXIS"
+license-files = ["LICENSE"]
 keywords = ["utils", "sigils", "string", "text", "meta-text", "context", "template"]
 dependencies = [
     "tomli>=2.0; python_version < '3.11'",
@@ -54,3 +55,7 @@ Bug-Tracker = "https://github.com/arthexis/sigils/issues"
 
 [project.scripts]
 sigils = "sigils.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["sigils*"]
+exclude = ["samples*", "tests*"]
