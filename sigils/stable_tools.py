@@ -10,11 +10,7 @@ import builtins as _builtins
 import importlib
 import json as _json
 import os
-
-try:
-    import tomllib as _tomllib
-except ModuleNotFoundError:  # Python 3.9 and 3.10
-    import tomli as _tomllib
+import tomllib as _tomllib
 
 
 DEFAULT_ENV_ALLOWLIST = frozenset(
@@ -49,7 +45,7 @@ def minimum(value):
 
 
 def maximum(value):
-    """Return the maximum number in a comma-separated list."""
+    """Return the maximum number in a comma-separated list of numbers."""
     return _builtins.max(_numbers(value))
 
 
