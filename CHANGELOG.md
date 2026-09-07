@@ -13,8 +13,8 @@ Release Notes
 - Removed development/release side effects from the public interpolation CLI.
 - Corrected broken numeric, hexadecimal, JSON, TOML, YAML, Markdown,
   environment, and ``sigil`` built-in behavior.
-- Added Python 3.9-3.13 CI coverage and a conditional ``tomli`` dependency for
-  Python versions without ``tomllib``.
+- Established Python 3.11 as the minimum supported version, with CI coverage
+  for Python 3.11-3.13 and standard-library ``tomllib`` for TOML support.
 - Reconciled optional dependencies, package metadata, documentation, and the
   ARTHEXIS License declaration.
 - Promoted the stabilized post-#20/#21 baseline from the unreleased 0.3.9
