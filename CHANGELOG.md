@@ -1,6 +1,24 @@
 Release Notes
 =============
 
+0.3.9 (2026-09-07)
+-------------------
+
+- Made ``[...]`` the canonical lazy sigil syntax and reserved ``%[...]`` for
+  eager ambient-context resolution.
+- Stabilized the CLI around the real ``python -m sigils`` / ``sigils`` entry
+  point with JSON and TOML context files.
+- Wired ``--max-depth``, ``--list-sep``, overwrite, output, expression, seed,
+  and directory rendering behavior through to the resolver.
+- Removed development/release side effects from the public interpolation CLI.
+- Corrected broken numeric, hexadecimal, JSON, TOML, YAML, Markdown,
+  environment, and ``sigil`` built-in behavior.
+- Added Python 3.9-3.13 CI coverage and a conditional ``tomli`` dependency for
+  Python versions without ``tomllib``.
+- Reconciled optional dependencies, package metadata, documentation, and the
+  ARTHEXIS License declaration.
+
+
 0.3.7 (2025-02-27)
 -------------------
 
