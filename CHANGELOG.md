@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+0.4.3 (2026-09-07)
+-------------------
+
+- Fixed eager ``Secret`` captures whose protected text contains lazy sigils so
+  the nested lazy expressions resolve against the explicit ``solve()`` context.
+- Preserved ``max_depth`` recursion limits while resolving sigils inside
+  captured eager secrets.
+- Fixed nested eager ``Secret`` captures so opaque internal markers are fully
+  replaced before intentional output rendering.
+
+
 0.4.2 (2026-09-07)
 -------------------
 
@@ -113,8 +124,6 @@ Sigils now use the following syntax:
 %[sigil-name:arg1:arg2:...]
 %[sigil_name]
 %[sigil_name:key1=value1:key2=value2:...]
-
-Check the new README.rst for more information.
 
 0.2.9 (2023-03-27)
 -------------------

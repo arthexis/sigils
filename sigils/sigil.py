@@ -73,23 +73,48 @@ class Sigil:
         """Resolve all remaining sigils with the provided context."""
         context = {} if context is None else context
         rendered = self._render_template(self._template, context, sep=sep)
-        return self._replace_captured(rendered, reveal=True, sep=sep)
+        return self._replace_captured(
+            rendered,
+            reveal=True,
+            sep=sep,
+            context=context,
+        )
 
-    def _capture_secret(self, value):
+    def _capture_secret(self, value, *, depth=0):
         """Store an eager secret out-of-band and return an opaque marker."""
         index = len(self._captured_secrets)
         marker = f"\x00SIGILS_SECRET_{index}\x00"
         while marker in self._template or marker in self._captured_secrets:
             index += 1
             marker = f"\x00SIGILS_SECRET_{index}\x00"
-        self._captured_secrets[marker] = value
+        self._captured_secrets[marker] = (value, depth)
         return marker
 
-    def _replace_captured(self, template, *, reveal, sep="|"):
+    def _replace_captured(self, template, *, reveal, sep="|", context=None):
         """Replace captured-secret markers with redacted or revealed text."""
         rendered = template
-        for marker, secret in self._captured_secrets.items():
-            replacement = self._stringify(secret, sep) if reveal else Secret.REDACTED
+        for marker, (secret, depth) in reversed(self._captured_secrets.items()):
+            if not reveal:
+                replacement = Secret.REDACTED
+            else:
+                value = secret
+                raw_value = value.reveal() if isinstance(value, Secret) else value
+                if (
+                    context is not None
+                    and isinstance(raw_value, str)
+                    and depth < self.max_depth
+                    and self.pattern.search(raw_value)
+                ):
+                    raw_value = self._render_template(
+                        raw_value,
+                        context,
+                        sep=sep,
+                        depth=depth + 1,
+                    )
+                    value = (
+                        Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    )
+                replacement = self._stringify(value, sep)
             rendered = rendered.replace(marker, replacement)
         return rendered
 
@@ -127,7 +152,7 @@ class Sigil:
                 value = Secret(raw_value) if protected else raw_value
 
             if eager_only and isinstance(value, Secret):
-                return self._capture_secret(value)
+                return self._capture_secret(value, depth=depth)
 
             return self._stringify(value, sep)
 
