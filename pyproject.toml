@@ -54,3 +54,15 @@ sigils = "sigils.__main__:main"
 [tool.setuptools.packages.find]
 include = ["sigils*"]
 exclude = ["samples*", "tests*"]
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = [
+    "sigils/benchmark.py",
+    "sigils/make.py",
+    "sigils/release.py",
+    "sigils/tools.py",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

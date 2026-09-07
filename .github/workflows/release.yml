@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish GitHub release
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.meta.outputs.created }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "${TAG} already exists; nothing to release."
+          else
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install release tooling
+        if: steps.meta.outputs.created == 'true'
+        run: python -m pip install --upgrade pip build twine
+      - name: Build wheel and sdist
+        if: steps.meta.outputs.created == 'true'
+        run: python -m build
+      - name: Validate distributions
+        if: steps.meta.outputs.created == 'true'
+        run: python -m twine check dist/*
+      - name: Clean wheel install smoke test
+        if: steps.meta.outputs.created == 'true'
+        shell: bash
+        run: |
+          python -m venv /tmp/sigils-release-install
+          /tmp/sigils-release-install/bin/python -m pip install --upgrade pip
+          /tmp/sigils-release-install/bin/python -m pip install dist/*.whl
+          /tmp/sigils-release-install/bin/python -m pip check
+          /tmp/sigils-release-install/bin/python -c 'from sigils import Context, Secret, Sigil; assert Sigil("[x]").solve({"x": "ok"}) == "ok"; assert str(Secret("hidden")) == "[REDACTED]"'
+      - name: Create version tag
+        if: steps.meta.outputs.created == 'true'
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$HEAD_SHA" -m "Sigils $TAG"
+          git push origin "$TAG"
+      - name: Create GitHub release
+        if: steps.meta.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          gh release create "$TAG" dist/*
+          --target "$HEAD_SHA"
+          --title "$TAG"
+          --generate-notes
+
+  pypi:
+    name: Publish to PyPI
+    needs: release
+    if: needs.release.outputs.created == 'true' && vars.PUBLISH_PYPI == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sigils
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Publish distributions
+        uses: pypa/gh-action-pypi-publish@release/v1

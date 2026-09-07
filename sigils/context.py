@@ -5,12 +5,12 @@ import threading
 
 class Context:
     local = threading.local()
-        
+
     def __init__(self, context):
         self.init_context = context
 
     def __enter__(self):
-        self.old_context = getattr(self.local, 'value', {})
+        self.old_context = getattr(self.local, "value", {})
         self.local.value = self.init_context
         return self.local.value
 
@@ -21,6 +21,6 @@ class Context:
         return self.local.value[key]
 
 
-# TODO: Add a "contextual" decorator that resolves default strings and string arguments 
+# TODO: Add a "contextual" decorator that resolves default strings and string arguments
 
 __all__ = ["Context"]
