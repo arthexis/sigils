@@ -171,6 +171,20 @@ instead of resolving it as another sigil:
     print(Sigil("[greet %name]") % context)
     # Hello, name!
 
+Multi-argument tools receive all declared arguments after each argument is
+resolved. For example, structured-data tools can parse a value and select a
+field in one expression:
+
+.. code-block:: python
+
+    context = {
+        "payload": '{"name": "Alice"}',
+        "field": "name",
+    }
+
+    print(Sigil("[json payload field]") % context)
+    # Alice
+
 The built-in ``sigil`` tool emits canonical lazy syntax, so applying it to
 ``name`` produces ``[name]`` rather than an eager token.
 
@@ -227,7 +241,14 @@ Files can be rendered to standard output, written elsewhere, or overwritten:
 
 When ``-f`` points to a directory, files whose names contain sigils are
 resolved recursively. Both the generated filename and its file contents use
-the supplied context.
+the supplied context. A resolved filename must remain a basename in the same
+directory; absolute paths and parent-relative paths are rejected. Existing
+destinations are also rejected unless ``--overwrite`` is explicitly supplied.
+Symlinks are removed before an explicit overwrite so rendering never follows a
+pre-existing symlink outside the selected directory.
+
+``--value`` entries are merged only into mapping contexts. JSON list or scalar
+contexts remain usable when no ``--value`` merge is requested.
 
 The CLI deliberately contains only interpolation operations. Historical
 benchmark, test-runner, make, and package-release switches are development
@@ -248,9 +269,13 @@ Considerations
 - **Eager Python Context**: ``%[...]`` reads the Python caller's locals and
   globals. Use lazy ``[...]`` when a template should depend only on an explicit
   context supplied later.
-- **Environment Tool**: the ``env`` built-in filters environment-variable names
-  associated with credentials and secrets. Requesting the complete environment
-  returns only non-sensitive entries.
+- **Environment Tool**: the ``env`` built-in exposes only explicitly allowlisted
+  names. Common non-secret process values such as ``PATH``, ``HOME``, ``USER``,
+  ``SHELL``, ``LANG``, ``PWD``, ``TERM``, and ``TZ`` are allowed by default.
+  Embedding applications can expose additional names with the comma-separated
+  ``SIGILS_ENV_ALLOWLIST`` environment variable. Unapproved names return an
+  empty string, and requesting the complete environment returns only approved
+  entries.
 
 
 Performance
