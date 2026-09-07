@@ -7,13 +7,11 @@ name = "sigils"
 version = "0.4.0"
 description = "Solve templates with [sigils]."
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "LicenseRef-ARTHEXIS"
 license-files = ["LICENSE"]
 keywords = ["utils", "sigils", "string", "text", "meta-text", "context", "template"]
-dependencies = [
-    "tomli>=2.0; python_version < '3.11'",
-]
+dependencies = []
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -23,8 +21,6 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "Environment :: Console",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -36,7 +32,6 @@ email = "arthexis@gmail.com"
 
 [project.optional-dependencies]
 dotenv = ["dotenv-python"]
-toml = ["tomli>=2.0; python_version < '3.11'"]
 yaml = ["pyyaml"]
 markdown = ["markdown"]
 astronomy = ["ephem"]
