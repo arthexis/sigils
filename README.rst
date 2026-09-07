@@ -9,6 +9,10 @@ context-based interpolation, function execution, nested and recursive
 interpolation, ambient execution context, built-in transformation tools, and a
 command-line interface.
 
+The maintained PyPI distribution is named ``gway-sigils``. The Python package
+and command-line interface remain named ``sigils``, so existing imports and
+runtime usage are unchanged.
+
 Any Python object can be provided as explicit context, including nested
 dictionaries, lists, and functions. Sigils supports Python 3.11 and newer and
 uses the standard-library ``tomllib`` module for TOML support.
@@ -17,11 +21,11 @@ Optional features can be installed individually or together:
 
 .. code-block:: bash
 
-    pip install sigils[dotenv]
-    pip install sigils[yaml]
-    pip install sigils[markdown]
-    pip install sigils[astronomy]
-    pip install sigils[all]
+    pip install gway-sigils[dotenv]
+    pip install gway-sigils[yaml]
+    pip install gway-sigils[markdown]
+    pip install gway-sigils[astronomy]
+    pip install gway-sigils[all]
 
 
 Installation
@@ -31,7 +35,7 @@ Install Sigils using pip:
 
 .. code-block:: bash
 
-    pip install sigils
+    pip install gway-sigils
 
 
 Syntax
