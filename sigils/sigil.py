@@ -3,6 +3,7 @@ import re
 import threading
 
 from .context import Context
+from .secret import Secret
 from .tools import tools
 
 
@@ -24,16 +25,22 @@ class Sigil:
         ``%`` operator. ``%[...]`` tokens are eager and are resolved during
         construction from the current execution context.
         """
-        self.template = str(template)
+        self._captured_secrets = {}
+        self._template = str(template)
         self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
         self.debug = debug if debug is not None else self.__class__.debug
 
         self.pattern = re.compile(r"(?P<eager>%)?\[(?P<expression>.*?)\]")
-        self.template = self._render_template(
-            self.template,
+        self._template = self._render_template(
+            self._template,
             self._ambient_context(),
             eager_only=True,
         )
+
+    @property
+    def template(self):
+        """Return the template with captured eager secrets redacted."""
+        return self._replace_captured(self._template, reveal=False)
 
     @staticmethod
     def _ambient_context():
@@ -63,7 +70,26 @@ class Sigil:
     def solve(self, context=None, sep="|"):
         """Resolve all remaining sigils with the provided context."""
         context = {} if context is None else context
-        return self._render_template(self.template, context, sep=sep)
+        rendered = self._render_template(self._template, context, sep=sep)
+        return self._replace_captured(rendered, reveal=True, sep=sep)
+
+    def _capture_secret(self, value):
+        """Store an eager secret out-of-band and return an opaque marker."""
+        index = len(self._captured_secrets)
+        marker = f"\x00SIGILS_SECRET_{index}\x00"
+        while marker in self._template or marker in self._captured_secrets:
+            index += 1
+            marker = f"\x00SIGILS_SECRET_{index}\x00"
+        self._captured_secrets[marker] = value
+        return marker
+
+    def _replace_captured(self, template, *, reveal, sep="|"):
+        """Replace captured-secret markers with redacted or revealed text."""
+        rendered = template
+        for marker, secret in self._captured_secrets.items():
+            replacement = self._stringify(secret, sep) if reveal else Secret.REDACTED
+            rendered = rendered.replace(marker, replacement)
+        return rendered
 
     def _render_template(self, template, context, *, sep="|", depth=0, eager_only=False):
         """Render matching sigils in *template* using the requested resolution phase."""
@@ -80,26 +106,59 @@ class Sigil:
             if value is _UNRESOLVED:
                 return match.group(0)
 
+            protected = isinstance(value, Secret)
+            raw_value = value.reveal() if protected else value
             if (
-                isinstance(value, str)
+                isinstance(raw_value, str)
                 and depth < self.max_depth
-                and self.pattern.search(value)
+                and self.pattern.search(raw_value)
             ):
-                value = self._render_template(
-                    value,
+                raw_value = self._render_template(
+                    raw_value,
                     context,
                     sep=sep,
                     depth=depth + 1,
                     eager_only=eager_only,
                 )
+                value = Secret(raw_value) if protected else raw_value
+
+            if eager_only and isinstance(value, Secret):
+                return self._capture_secret(value)
 
             return self._stringify(value, sep)
 
         return self.pattern.sub(replace, template)
 
-    @staticmethod
-    def _stringify(value, sep):
+    @classmethod
+    def _reveal_value(cls, value):
+        """Recursively unwrap protected values for intentional template output."""
+        if isinstance(value, Secret):
+            return cls._reveal_value(value.reveal())
+        if isinstance(value, dict):
+            return {key: cls._reveal_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [cls._reveal_value(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(cls._reveal_value(item) for item in value)
+        return value
+
+    @classmethod
+    def _redact_value(cls, value):
+        """Recursively replace protected values with the redaction marker."""
+        if isinstance(value, Secret):
+            return Secret.REDACTED
+        if isinstance(value, dict):
+            return {key: cls._redact_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [cls._redact_value(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(cls._redact_value(item) for item in value)
+        return value
+
+    @classmethod
+    def _stringify(cls, value, sep):
         """Convert a resolved value to template text using *sep* for mappings."""
+        value = cls._reveal_value(value)
         if isinstance(value, dict):
             if "value" in value:
                 return str(value["value"])
@@ -107,22 +166,34 @@ class Sigil:
         return str(value)
 
     def _run_func(self, func, func_args, value, context):
-        """Resolve declared function arguments and invoke a context callable or tool."""
+        """Resolve function arguments, invoke *func*, and preserve secret taint."""
         num_args = func.__code__.co_argcount
+        protected = isinstance(value, Secret)
+        call_value = value.reveal() if protected else value
+
         if func_args:
-            solved_args = [
-                self._render_template(f"[{arg}]", context)
-                for arg in func_args
-            ]
+            solved_args = []
+            for arg in func_args:
+                resolved = self._resolve_expression(arg, context)
+                if isinstance(resolved, Secret):
+                    protected = True
+                solved_args.append(self._render_template(f"[{arg}]", context))
+
             if num_args > 0:
                 if solved_args and "[" not in solved_args[0]:
-                    return func(solved_args[0], *solved_args[1:num_args])
-                return func(func_args[0], *func_args[1:num_args])
-            return func()
+                    result = func(solved_args[0], *solved_args[1:num_args])
+                else:
+                    result = func(func_args[0], *func_args[1:num_args])
+            else:
+                result = func()
+        elif num_args == 1:
+            result = func(call_value)
+        else:
+            result = func(None)
 
-        if num_args == 1:
-            return func(value)
-        return func(None)
+        if protected and result is not None and not isinstance(result, Secret):
+            return Secret(result)
+        return result
 
     def _resolve_expression(self, expression, context):
         """Resolve a dotted sigil expression against context, attributes, and tools."""
@@ -141,16 +212,19 @@ class Sigil:
                 key = key[1:]
                 literal = True
 
+            parent_protected = isinstance(value, Secret)
+            lookup_value = value.reveal() if parent_protected else value
+
             if literal:
                 temp = key
-            elif isinstance(value, dict) and key in value:
-                temp = value.get(key)
+            elif isinstance(lookup_value, dict) and key in lookup_value:
+                temp = lookup_value.get(key)
                 if callable(temp):
                     temp = self._run_func(temp, func_args, value, context)
                     if temp is None:
                         temp = key
-            elif isinstance(value, list) and key.lstrip("+-").isdigit():
-                temp = value[int(key)]
+            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                temp = lookup_value[int(key)]
             elif key in tools:
                 tool_func = tools[key]
                 if callable(tool_func):
@@ -167,26 +241,33 @@ class Sigil:
 
             if temp is None and "-" in key and not literal:
                 temp = (
-                    value.get(key.replace("-", "_"))
-                    if isinstance(value, dict)
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
                     else None
                 )
 
-            if temp is None and value is not None and hasattr(value, key) and not literal:
-                temp = getattr(value, key)
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+            ):
+                temp = getattr(lookup_value, key)
 
             if (
                 temp is None
-                and value is not None
+                and lookup_value is not None
                 and "-" in key
-                and hasattr(value, key.replace("-", "_"))
+                and hasattr(lookup_value, key.replace("-", "_"))
                 and not literal
             ):
-                temp = getattr(value, key.replace("-", "_"))
+                temp = getattr(lookup_value, key.replace("-", "_"))
 
             if temp is None:
                 return _UNRESOLVED
 
+            if parent_protected and not isinstance(temp, Secret):
+                temp = Secret(temp)
             value = temp
 
         return value if value is not None else _UNRESOLVED
@@ -194,7 +275,7 @@ class Sigil:
     def _solve(self, context, depth=0, template=None):
         """Return resolved values for sigils in a template."""
         context = {} if context is None else context
-        template = self.template if template is None else template
+        template = self._template if template is None else template
         solved = {}
 
         for match in self.pattern.finditer(template):
@@ -203,15 +284,21 @@ class Sigil:
             if value is _UNRESOLVED:
                 continue
 
+            raw_value = value.reveal() if isinstance(value, Secret) else value
             if (
-                isinstance(value, str)
+                isinstance(raw_value, str)
+                and not isinstance(value, Secret)
                 and depth < self.max_depth
-                and self.pattern.search(value)
+                and self.pattern.search(raw_value)
             ):
-                sub_values = self._solve(context, depth + 1, value)
+                sub_values = self._solve(context, depth + 1, raw_value)
                 if sub_values:
                     solved[expression] = {
-                        "value": self._render_template(value, context, depth=depth + 1),
+                        "value": self._render_template(
+                            raw_value,
+                            context,
+                            depth=depth + 1,
+                        ),
                         "sub_values": sub_values,
                     }
                     continue
@@ -221,8 +308,8 @@ class Sigil:
         return solved
 
     def results(self, context):
-        """Return a dictionary with the sigils and their resolved values."""
-        return self._solve(context)
+        """Return resolved sigil values with protected data redacted."""
+        return self._redact_value(self._solve(context))
 
     def __mod__(self, context):
         """Resolve the template using the modulus operator."""
