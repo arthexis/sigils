@@ -9,7 +9,7 @@ on:
       tag:
         description: Existing release tag to publish to PyPI
         required: true
-        default: v0.4.1
+        default: v0.4.2
         type: string
 
 permissions:
@@ -108,7 +108,7 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/p/sigils
+      url: https://pypi.org/p/gway-sigils
     steps:
       - name: Resolve publish tag
         id: meta
