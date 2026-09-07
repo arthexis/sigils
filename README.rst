@@ -6,22 +6,23 @@ Sigils
 
 Sigils is a Python library for text and meta-text interpolation. It provides
 context-based interpolation, function execution, nested and recursive
-interpolation, ambient execution context, and a command-line interface.
+interpolation, ambient execution context, built-in transformation tools, and a
+command-line interface.
 
 Any Python object can be provided as explicit context, including nested
-dictionaries, lists, and functions. Sigils can be used directly from Python or
-from the command line. The core package has no required dependencies outside
-of the Python standard library.
+dictionaries, lists, and functions. Sigils supports Python 3.9 and newer.
+Python 3.11+ uses the standard-library ``tomllib`` module; Python 3.9 and 3.10
+automatically install ``tomli`` for equivalent TOML support.
 
-You may also install optional dependencies:
+Optional features can be installed individually or together:
 
 .. code-block:: bash
 
     pip install sigils[dotenv]
-    pip install sigils[toml]
     pip install sigils[yaml]
     pip install sigils[markdown]
-    pip install sigils[all]  # Installs everything
+    pip install sigils[astronomy]
+    pip install sigils[all]
 
 
 Installation
@@ -116,6 +117,8 @@ values to be passed to every ``Sigil`` constructor.
     print(template.template)  # Hello, world!
 
 Caller locals and globals take precedence over values from ``Context``.
+Explicit ``solve(context)`` resolution uses the context passed to ``solve``;
+it does not implicitly merge the ambient ``Context``.
 
 
 Nested values, lists, and tools
@@ -135,6 +138,9 @@ Dotted sigils traverse nested dictionaries, lists, and object attributes:
     }
 
     print(Sigil("[users.1.name]") % context)  # Bob
+
+Dictionary keys are case-sensitive and exact. For example, ``[name]`` and
+``[Name]`` may refer to two different values in the same context.
 
 Built-in tools can be chained as part of an expression:
 
@@ -165,6 +171,9 @@ instead of resolving it as another sigil:
     print(Sigil("[greet %name]") % context)
     # Hello, name!
 
+The built-in ``sigil`` tool emits canonical lazy syntax, so applying it to
+``name`` produces ``[name]`` rather than an eager token.
+
 
 Recursive interpolation
 =======================
@@ -191,15 +200,38 @@ later explicit solve.
 Command-Line Usage
 ==================
 
-Sigils can be used directly from the command line. Context supplied to the CLI
-resolves normal ``[...]`` sigils explicitly:
+The CLI resolves normal ``[...]`` sigils against values supplied on the command
+line or loaded from a JSON/TOML context file:
 
 .. code-block:: bash
 
     sigils "Hello, [user.name]!" -c context.json
+    sigils "Hello, [name]!" -v name=Alice
+    sigils -e name.upper -v name=alice
 
-With a JSON context such as ``{"user": {"name": "Alice"}}``, the command
-outputs ``Hello, Alice!``.
+Use ``--max-depth`` to control recursive interpolation and ``--list-sep`` to
+choose the separator used when a dictionary is rendered as its keys:
+
+.. code-block:: bash
+
+    sigils "[a]" -d 0 -v 'a=[b]' -v b=resolved
+    sigils "[mapping]" -c context.json --list-sep ","
+
+Files can be rendered to standard output, written elsewhere, or overwritten:
+
+.. code-block:: bash
+
+    sigils -f template.conf -c context.toml
+    sigils -f template.conf -w generated.conf -c context.toml
+    sigils -f template.conf -r -c context.toml
+
+When ``-f`` points to a directory, files whose names contain sigils are
+resolved recursively. Both the generated filename and its file contents use
+the supplied context.
+
+The CLI deliberately contains only interpolation operations. Historical
+benchmark, test-runner, make, and package-release switches are development
+concerns and are no longer exposed as public CLI flags.
 
 
 Considerations
@@ -209,12 +241,16 @@ Considerations
   executed and its return value used in the string. Only provide contexts and
   tools that are safe to execute.
 - **Recursion Depth**: Sigils resolves recursively up to 6 levels by default.
-  Pass ``max_depth`` to ``Sigil`` to choose a different limit.
+  Pass ``max_depth`` to ``Sigil`` or ``--max-depth`` to the CLI to choose a
+  different limit.
 - **Thread Safety**: ``Context`` uses thread-local state. Mutable objects stored
   inside a context still require normal application-level synchronization.
 - **Eager Python Context**: ``%[...]`` reads the Python caller's locals and
   globals. Use lazy ``[...]`` when a template should depend only on an explicit
   context supplied later.
+- **Environment Tool**: the ``env`` built-in filters environment-variable names
+  associated with credentials and secrets. Requesting the complete environment
+  returns only non-sensitive entries.
 
 
 Performance
@@ -227,4 +263,5 @@ performs competitively with Python's built-in string formatting.
 License
 =======
 
-See the repository LICENSE file for licensing terms.
+Sigils is distributed under the ARTHEXIS License. See ``LICENSE`` for the full
+terms.
