@@ -75,8 +75,14 @@ def test_safe_namespace_keeps_unknown_keys_unresolved() -> None:
 def test_safe_namespace_blocks_attribute_escape_from_provider_values() -> None:
     namespace = SafeNamespace(DangerousProvider())
 
-    assert Sigil("[node.object.public]").solve({"node": namespace}) == "[node.object.public]"
-    assert Sigil("[node.object.method]").solve({"node": namespace}) == "[node.object.method]"
+    assert (
+        Sigil("[node.object.public]").solve({"node": namespace})
+        == "[node.object.public]"
+    )
+    assert (
+        Sigil("[node.object.method]").solve({"node": namespace})
+        == "[node.object.method]"
+    )
 
 
 def test_safe_namespace_does_not_execute_provider_callables() -> None:
