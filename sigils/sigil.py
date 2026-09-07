@@ -3,6 +3,7 @@ import re
 import threading
 
 from .context import Context
+from .namespace import SafeNamespace
 from .secret import Secret
 from .tools import tools
 
@@ -229,6 +230,7 @@ class Sigil:
         keys = expression.split(".")
         value = context
         func_args = []
+        protected_path = False
 
         for key in keys:
             if " " in key:
@@ -246,6 +248,23 @@ class Sigil:
 
             if literal:
                 temp = key
+            elif isinstance(lookup_value, SafeNamespace):
+                if func_args:
+                    return _UNRESOLVED
+                try:
+                    temp = lookup_value.resolve(key)
+                except KeyError:
+                    return _UNRESOLVED
+                protected_path = True
+            elif protected_path:
+                if func_args:
+                    return _UNRESOLVED
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    temp = lookup_value.get(key)
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    temp = lookup_value[int(key)]
+                else:
+                    return _UNRESOLVED
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
                 if callable(temp):
@@ -265,10 +284,13 @@ class Sigil:
             else:
                 temp = None
 
+            if protected_path and callable(temp):
+                return _UNRESOLVED
+
             if temp and callable(temp):
                 temp = temp()
 
-            if temp is None and "-" in key and not literal:
+            if temp is None and "-" in key and not literal and not protected_path:
                 temp = (
                     lookup_value.get(key.replace("-", "_"))
                     if isinstance(lookup_value, dict)
@@ -280,6 +302,7 @@ class Sigil:
                 and lookup_value is not None
                 and hasattr(lookup_value, key)
                 and not literal
+                and not protected_path
             ):
                 temp = getattr(lookup_value, key)
 
@@ -289,6 +312,7 @@ class Sigil:
                 and "-" in key
                 and hasattr(lookup_value, key.replace("-", "_"))
                 and not literal
+                and not protected_path
             ):
                 temp = getattr(lookup_value, key.replace("-", "_"))
 
