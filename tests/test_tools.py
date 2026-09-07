@@ -10,6 +10,19 @@ from sigils import tools as tools_module
 class TestStableTools(unittest.TestCase):
     """Verify corrected helpers directly and through Sigil expressions."""
 
+    def test_registry_is_explicit_and_self_describing(self):
+        """Expose canonical functions and the registry itself without patching."""
+        self.assertIs(tools_module.tools["upper"], tools_module.upper)
+        self.assertIs(tools_module.tools["tools"], tools_module.tools)
+
+    def test_historical_conversion_helpers_remain_compatible(self):
+        """Retain useful historical tool names while correcting broken behavior."""
+        self.assertEqual(tools_module.roman("14"), "XIV")
+        self.assertEqual(tools_module.arabic("XIV"), "14")
+        self.assertEqual(tools_module.chr("65"), "A")
+        self.assertTrue(tools_module.isprime("17"))
+        self.assertFalse(tools_module.isprime("21"))
+
     def test_numeric_aggregates_do_not_shadow_python_builtins(self):
         """Use Python builtins instead of recursively shadowing tool names."""
         self.assertEqual(tools_module.min("3,1,2"), 1.0)
