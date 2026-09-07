@@ -10,6 +10,8 @@ _UNRESOLVED = object()
 
 
 class Sigil:
+    """Parse and resolve lazy and eager sigil templates."""
+
     cache = threading.local()
 
     max_depth = 6
@@ -64,10 +66,12 @@ class Sigil:
         return self._render_template(self.template, context, sep=sep)
 
     def _render_template(self, template, context, *, sep="|", depth=0, eager_only=False):
+        """Render matching sigils in *template* using the requested resolution phase."""
         if depth > self.max_depth:
             return template
 
         def replace(match):
+            """Resolve one regular-expression match or preserve it when unresolved."""
             if eager_only and not match.group("eager"):
                 return match.group(0)
 
@@ -95,6 +99,7 @@ class Sigil:
 
     @staticmethod
     def _stringify(value, sep):
+        """Convert a resolved value to template text using *sep* for mappings."""
         if isinstance(value, dict):
             if "value" in value:
                 return str(value["value"])
@@ -102,6 +107,7 @@ class Sigil:
         return str(value)
 
     def _run_func(self, func, func_args, value, context):
+        """Resolve declared function arguments and invoke a context callable or tool."""
         num_args = func.__code__.co_argcount
         if func_args:
             solved_args = [
@@ -110,8 +116,8 @@ class Sigil:
             ]
             if num_args > 0:
                 if solved_args and "[" not in solved_args[0]:
-                    return func(solved_args[0], *solved_args[1:num_args - 1])
-                return func(func_args[0], *func_args[1:num_args - 1])
+                    return func(solved_args[0], *solved_args[1:num_args])
+                return func(func_args[0], *func_args[1:num_args])
             return func()
 
         if num_args == 1:
@@ -119,6 +125,7 @@ class Sigil:
         return func(None)
 
     def _resolve_expression(self, expression, context):
+        """Resolve a dotted sigil expression against context, attributes, and tools."""
         keys = expression.split(".")
         value = context
         func_args = []
