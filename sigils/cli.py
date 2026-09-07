@@ -16,9 +16,28 @@ def build_parser():
     arg("--context", "--ctx", "--with", "-c", help="JSON or TOML context file.")
     arg("--debug", "-b", action="store_true", help="Print debug output.")
     arg("--expression", "--expr", "-e", help="Auto-wrap an expression in [brackets].")
-    arg("--file", "--path", "--infile", "--source", "-f", "-s", help="Template file or directory.")
-    arg("--list-sep", "--ls", default="|", help="Separator used when rendering dictionary keys.")
-    arg("--max-depth", "-d", type=int, default=6, help="Maximum recursive interpolation depth.")
+    arg(
+        "--file",
+        "--path",
+        "--infile",
+        "--source",
+        "-f",
+        "-s",
+        help="Template file or directory.",
+    )
+    arg(
+        "--list-sep",
+        "--ls",
+        default="|",
+        help="Separator used when rendering dictionary keys.",
+    )
+    arg(
+        "--max-depth",
+        "-d",
+        type=int,
+        default=6,
+        help="Maximum recursive interpolation depth.",
+    )
     arg(
         "--overwrite",
         "--replace",
@@ -28,8 +47,22 @@ def build_parser():
         help="Overwrite the input file or existing directory-rendered destinations.",
     )
     arg("--seed", type=int, default=None, help="Seed the built-in random tools.")
-    arg("--value", "-v", action="append", default=[], help="Additional context entry in KEY=VALUE form.")
-    arg("--write", "--output", "--outfile", "--target", "-o", "-w", help="Write output to a file.")
+    arg(
+        "--value",
+        "-v",
+        action="append",
+        default=[],
+        help="Additional context entry in KEY=VALUE form.",
+    )
+    arg(
+        "--write",
+        "--output",
+        "--outfile",
+        "--target",
+        "-o",
+        "-w",
+        help="Write output to a file.",
+    )
     return parser
 
 
