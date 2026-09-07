@@ -31,7 +31,9 @@ class TestSigilCLI(unittest.TestCase):
 
     def test_solve_from_file(self):
         """Render a template file to standard output."""
-        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as temp_file:
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, encoding="utf-8"
+        ) as temp_file:
             temp_file.write("Hello, [name]!")
             input_path = temp_file.name
 
@@ -45,10 +47,14 @@ class TestSigilCLI(unittest.TestCase):
 
     def test_write_output_to_file(self):
         """Write rendered output to the requested destination file."""
-        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as input_file:
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, encoding="utf-8"
+        ) as input_file:
             input_file.write("Hello, [name]!")
             input_path = input_file.name
-        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as output_file:
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, encoding="utf-8"
+        ) as output_file:
             output_path = output_file.name
 
         try:
@@ -66,7 +72,9 @@ class TestSigilCLI(unittest.TestCase):
 
     def test_overwrite_file(self):
         """Overwrite the input template when the replace flag is explicit."""
-        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as temp_file:
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, encoding="utf-8"
+        ) as temp_file:
             temp_file.write("Hello, [name]!")
             input_path = temp_file.name
 
@@ -170,9 +178,7 @@ class TestSigilCLI(unittest.TestCase):
             with open(input_path, "w", encoding="utf-8") as file:
                 file.write("content")
 
-            _, stderr, code = self.run_cli(
-                ["-f", temp_dir, "-v", "name=../output"]
-            )
+            _, stderr, code = self.run_cli(["-f", temp_dir, "-v", "name=../output"])
             self.assertEqual(code, 2)
             self.assertIn("must be a basename", stderr)
 
@@ -183,9 +189,7 @@ class TestSigilCLI(unittest.TestCase):
             with open(input_path, "w", encoding="utf-8") as file:
                 file.write("content")
 
-            _, stderr, code = self.run_cli(
-                ["-f", temp_dir, "-v", "name=/tmp/output"]
-            )
+            _, stderr, code = self.run_cli(["-f", temp_dir, "-v", "name=/tmp/output"])
             self.assertEqual(code, 2)
             self.assertIn("must be a basename", stderr)
 
@@ -276,7 +280,9 @@ class TestSigilCLI(unittest.TestCase):
 
     def test_unsupported_context_format_is_an_error(self):
         """Reject context file extensions the loader does not implement."""
-        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as context_file:
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, suffix=".txt"
+        ) as context_file:
             context_path = context_file.name
 
         try:
