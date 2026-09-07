@@ -2,12 +2,8 @@ import argparse
 import json
 import os
 import random
+import tomllib
 from collections.abc import MutableMapping
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.9 and 3.10
-    import tomli as tomllib
 
 from .sigil import Sigil
 
