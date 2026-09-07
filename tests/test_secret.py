@@ -94,7 +94,7 @@ class TestSecret(unittest.TestCase):
 
     def test_eager_secret_is_captured_without_plaintext_template_storage(self):
         """Capture eager secrets out of band while keeping template inspection redacted."""
-        password = Secret("swordfish")
+        password = Secret("swordfish")  # noqa: F841 - read through ambient locals
         template = Sigil("password=%[password]")
 
         self.assertEqual(template.template, "password=[REDACTED]")
