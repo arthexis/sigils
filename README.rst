@@ -10,9 +10,8 @@ interpolation, ambient execution context, built-in transformation tools, and a
 command-line interface.
 
 Any Python object can be provided as explicit context, including nested
-dictionaries, lists, and functions. Sigils supports Python 3.9 and newer.
-Python 3.11+ uses the standard-library ``tomllib`` module; Python 3.9 and 3.10
-automatically install ``tomli`` for equivalent TOML support.
+dictionaries, lists, and functions. Sigils supports Python 3.11 and newer and
+uses the standard-library ``tomllib`` module for TOML support.
 
 Optional features can be installed individually or together:
 
