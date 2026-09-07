@@ -15,6 +15,7 @@ class TestSigil(unittest.TestCase):
 
     def setUp(self):
         """Create a reusable context containing values, nesting, and callables."""
+
         def recursive(x):
             """Return a greeting used by recursive-callable tests."""
             return f"Hello, {x}!"
