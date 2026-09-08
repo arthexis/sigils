@@ -225,7 +225,7 @@ class Sigil:
             return Secret(result)
         return result
 
-    def _resolve_traversal(self, expression, context):
+    def _resolve_traversal(self, expression, context, *, invoke_final=True):
         """Try whitespace as path traversal without invoking intermediate callables."""
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -297,9 +297,10 @@ class Sigil:
             if callable(temp) and final:
                 if protected_path:
                     return _UNRESOLVED
-                temp = self._run_func(temp, [], value, context)
-                if temp is None:
-                    temp = key
+                if invoke_final:
+                    temp = self._run_func(temp, [], value, context)
+                    if temp is None:
+                        temp = key
 
             if parent_protected and not isinstance(temp, Secret):
                 temp = Secret(temp)
@@ -411,10 +412,15 @@ class Sigil:
         """Resolve dot paths, traversal-first spaces, and forced ``:`` calls."""
         if ":" in expression:
             target, arguments = expression.split(":", 1)
-            call_expression = target.strip()
-            if arguments.strip():
-                call_expression = f"{call_expression} {arguments.strip()}"
-            return self._resolve_legacy_expression(call_expression, context)
+            function = self._resolve_traversal(
+                target.strip(), context, invoke_final=False
+            )
+            if function is _UNRESOLVED or not callable(function):
+                return _UNRESOLVED
+            func_args = arguments.split() if arguments.strip() else []
+            if not func_args:
+                return function()
+            return self._run_func(function, func_args, context, context)
 
         if re.search(r"\s", expression):
             traversed = self._resolve_traversal(expression, context)
