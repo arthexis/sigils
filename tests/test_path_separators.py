@@ -39,10 +39,11 @@ def test_colon_always_calls_instead_of_traversing() -> None:
     assert Sigil("[probe:status]").solve(context) == "called:argument"
 
 
-def test_colon_can_force_zero_argument_call() -> None:
+def test_final_callable_invokes_without_colon_and_trailing_colon_is_literal() -> None:
     context = {"now": lambda: "current"}
 
-    assert Sigil("[now:]").solve(context) == "current"
+    assert Sigil("[now]").solve(context) == "current"
+    assert Sigil("[now:]").solve(context) == "now"
 
 
 def test_colon_requires_callable_left_side() -> None:
