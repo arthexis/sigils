@@ -21,7 +21,9 @@ class Sigil:
     def __init__(self, template, *, max_depth=None, debug=None):
         self._captured_secrets = {}
         self._template = str(template)
-        self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
+        self.max_depth = (
+            max_depth if max_depth is not None else self.__class__.max_depth
+        )
         self.debug = debug if debug is not None else self.__class__.debug
         self.pattern = re.compile(r"(?P<eager>%)?\[(?P<expression>.*?)\]")
         self._template = self._render_template(
@@ -89,7 +91,9 @@ class Sigil:
                         sep=sep,
                         depth=depth + 1,
                     )
-                    value = Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    value = (
+                        Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    )
                 replacement = self._stringify(value, sep)
             rendered = rendered.replace(marker, replacement)
         return rendered
@@ -231,7 +235,11 @@ class Sigil:
                 return _UNRESOLVED
             else:
                 result = func()
-            if protected and result is not _UNRESOLVED and not isinstance(result, Secret):
+            if (
+                protected
+                and result is not _UNRESOLVED
+                and not isinstance(result, Secret)
+            ):
                 return Secret(result)
             return result
 
@@ -260,7 +268,9 @@ class Sigil:
 
     @staticmethod
     def _provider_callable(value):
-        return callable(value) and bool(getattr(value, "__sigils_safe_callable__", False))
+        return callable(value) and bool(
+            getattr(value, "__sigils_safe_callable__", False)
+        )
 
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
@@ -375,6 +385,8 @@ class Sigil:
                     return _UNRESOLVED
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
+                if isinstance(temp, SafeNamespace) and func_args:
+                    return _UNRESOLVED
                 if callable(temp):
                     temp = self._run_func(temp, func_args, value, context)
                     if temp is None:
