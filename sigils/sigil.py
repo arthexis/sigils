@@ -221,9 +221,21 @@ class Sigil:
         return result
 
     def _run_func(self, func, func_args, value, context):
-        num_args = func.__code__.co_argcount
         protected = isinstance(value, Secret)
         call_value = value.reveal() if protected else value
+
+        if self._provider_callable(func):
+            if func_args:
+                result = self._run_structured_call(func, func_args, context)
+            elif getattr(func, "__sigils_requires_args__", False):
+                return _UNRESOLVED
+            else:
+                result = func()
+            if protected and result is not _UNRESOLVED and not isinstance(result, Secret):
+                return Secret(result)
+            return result
+
+        num_args = func.__code__.co_argcount
         if func_args:
             solved_args = []
             for arg in func_args:
@@ -317,6 +329,8 @@ class Sigil:
                     return _UNRESOLVED
                 if invoke_final:
                     temp = self._run_func(temp, [], value, context)
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
                     if temp is None:
                         temp = key
             if parent_protected and not isinstance(temp, Secret):
@@ -378,6 +392,8 @@ class Sigil:
             else:
                 temp = None
             if protected_path and callable(temp) and not self._provider_callable(temp):
+                return _UNRESOLVED
+            if temp is _UNRESOLVED:
                 return _UNRESOLVED
             if temp and callable(temp):
                 temp = temp()
