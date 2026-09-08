@@ -225,8 +225,93 @@ class Sigil:
             return Secret(result)
         return result
 
-    def _resolve_expression(self, expression, context):
-        """Resolve a dotted sigil expression against context, attributes, and tools."""
+    def _resolve_traversal(self, expression, context, *, invoke_final=True):
+        """Try whitespace as path traversal without invoking intermediate callables."""
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
+        value = context
+        protected_path = False
+
+        for index, key in enumerate(keys):
+            literal = False
+            if key.startswith("%"):
+                key = key[1:]
+                literal = True
+
+            parent_protected = isinstance(value, Secret)
+            lookup_value = value.reveal() if parent_protected else value
+
+            if literal:
+                if callable(lookup_value):
+                    return _UNRESOLVED
+                temp = key
+            elif isinstance(lookup_value, SafeNamespace):
+                try:
+                    temp = lookup_value.resolve(key)
+                except KeyError:
+                    return _UNRESOLVED
+                protected_path = True
+            elif protected_path:
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    temp = lookup_value.get(key)
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    temp = lookup_value[int(key)]
+                else:
+                    return _UNRESOLVED
+            elif isinstance(lookup_value, dict) and key in lookup_value:
+                temp = lookup_value.get(key)
+            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                temp = lookup_value[int(key)]
+            elif key in tools:
+                temp = tools[key]
+            else:
+                temp = None
+
+            if temp is None and "-" in key and not literal and not protected_path:
+                temp = (
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
+                    else None
+                )
+
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key)
+
+            if (
+                temp is None
+                and lookup_value is not None
+                and "-" in key
+                and hasattr(lookup_value, key.replace("-", "_"))
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key.replace("-", "_"))
+
+            if temp is None:
+                return _UNRESOLVED
+
+            final = index == len(keys) - 1
+            if callable(temp) and final:
+                if protected_path:
+                    return _UNRESOLVED
+                if invoke_final:
+                    temp = self._run_func(temp, [], value, context)
+                    if temp is None:
+                        temp = key
+
+            if parent_protected and not isinstance(temp, Secret):
+                temp = Secret(temp)
+            value = temp
+
+        return value if value is not None else _UNRESOLVED
+
+    def _resolve_legacy_expression(self, expression, context):
+        """Resolve dotted paths and the historical space-separated call syntax."""
         keys = expression.split(".")
         value = context
         func_args = []
@@ -234,7 +319,7 @@ class Sigil:
 
         for key in keys:
             if " " in key:
-                key_parts = key.split(" ")
+                key_parts = key.split()
                 key = key_parts[0]
                 func_args = key_parts[1:]
 
@@ -324,6 +409,27 @@ class Sigil:
             value = temp
 
         return value if value is not None else _UNRESOLVED
+
+    def _resolve_expression(self, expression, context):
+        """Resolve dot paths, traversal-first spaces, and forced ``:`` calls."""
+        if ":" in expression:
+            target, arguments = expression.split(":", 1)
+            function = self._resolve_traversal(
+                target.strip(), context, invoke_final=False
+            )
+            if function is _UNRESOLVED or not callable(function):
+                return _UNRESOLVED
+            func_args = arguments.split() if arguments.strip() else []
+            if not func_args:
+                return function()
+            return self._run_func(function, func_args, context, context)
+
+        if re.search(r"\s", expression):
+            traversed = self._resolve_traversal(expression, context)
+            if traversed is not _UNRESOLVED:
+                return traversed
+
+        return self._resolve_legacy_expression(expression, context)
 
     def _solve(self, context, depth=0, template=None):
         """Return resolved values for sigils in a template."""
