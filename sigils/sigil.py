@@ -241,6 +241,8 @@ class Sigil:
             lookup_value = value.reveal() if parent_protected else value
 
             if literal:
+                if callable(lookup_value):
+                    return _UNRESOLVED
                 temp = key
             elif isinstance(lookup_value, SafeNamespace):
                 try:
