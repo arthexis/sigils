@@ -6,8 +6,9 @@ from sigils import SafeNamespace, Sigil
 class ApprovedCall:
     __sigils_safe_callable__ = True
 
-    def __init__(self, function):
+    def __init__(self, function, *, requires_args: bool = False):
         self.function = function
+        self.__sigils_requires_args__ = requires_args
 
     def __call__(self, *args, **kwargs):
         return self.function(*args, **kwargs)
@@ -59,6 +60,15 @@ def test_whitespace_around_colon_comma_and_equals_is_ignored() -> None:
 def test_provider_approved_callable_can_be_invoked() -> None:
     command = ApprovedCall(lambda interface: f"ip:{interface}")
     context = {"network": SafeNamespace({"ip": command}), "wlan0": "wlan0"}
+    assert Sigil("[network ip : wlan0]").solve(context) == "ip:wlan0"
+
+
+def test_provider_callable_requiring_args_stays_unresolved_without_call_args() -> None:
+    command = ApprovedCall(lambda interface: f"ip:{interface}", requires_args=True)
+    context = {"network": SafeNamespace({"ip": command}), "wlan0": "wlan0"}
+
+    assert Sigil("[network.ip]").solve(context) == "[network.ip]"
+    assert Sigil("[network.ip||:offline]").solve(context) == "offline"
     assert Sigil("[network ip : wlan0]").solve(context) == "ip:wlan0"
 
 
