@@ -412,12 +412,22 @@ class Sigil:
 
     @staticmethod
     def _fallback_truthy(value):
-        """Return Python truthiness for a fallback candidate, revealing secrets only locally."""
+        """Return Python truthiness for a loose fallback candidate."""
         raw_value = value.reveal() if isinstance(value, Secret) else value
         return bool(raw_value)
 
+    @staticmethod
+    def _strict_fallback_missing(value):
+        """Return whether ``||`` should advance to the next branch."""
+        if value is _UNRESOLVED:
+            return True
+        raw_value = value.reveal() if isinstance(value, Secret) else value
+        return raw_value is None or (
+            isinstance(raw_value, (set, frozenset)) and not raw_value
+        )
+
     def _resolve_single_expression(self, expression, context):
-        """Resolve one expression without interpreting fallback ``|`` operators."""
+        """Resolve one expression without interpreting fallback operators."""
         expression = expression.strip()
         if not expression:
             return _UNRESOLVED
@@ -444,25 +454,50 @@ class Sigil:
 
         return self._resolve_legacy_expression(expression, context)
 
+    @staticmethod
+    def _split_fallback_expression(expression):
+        """Return branches and the operator preceding each later branch."""
+        parts = re.split(r"(\|\|?|)", expression)
+        branches = []
+        operators = []
+        current = parts[0]
+        index = 1
+        while index + 1 < len(parts):
+            operator = parts[index]
+            next_branch = parts[index + 1]
+            if operator:
+                branches.append(current)
+                operators.append(operator)
+                current = next_branch
+            else:
+                current += next_branch
+            index += 2
+        branches.append(current)
+        return branches, operators
+
     def _resolve_expression(self, expression, context):
-        """Resolve paths, calls, literals, and left-to-right fallback chains."""
+        """Resolve paths, calls, literals, and loose/strict fallback chains."""
         if "|" not in expression:
             return self._resolve_single_expression(expression, context)
 
-        last_falsey = _UNRESOLVED
-        for branch in expression.split("|"):
+        branches, operators = self._split_fallback_expression(expression)
+        value = self._resolve_single_expression(branches[0], context)
+
+        for operator, branch in zip(operators, branches[1:], strict=True):
+            should_fallback = (
+                self._strict_fallback_missing(value)
+                if operator == "||"
+                else value is _UNRESOLVED or not self._fallback_truthy(value)
+            )
+            if not should_fallback:
+                return value
+
             branch = branch.strip()
             if branch.startswith(":"):
                 return branch[1:]
-
             value = self._resolve_single_expression(branch, context)
-            if value is _UNRESOLVED:
-                continue
-            if self._fallback_truthy(value):
-                return value
-            last_falsey = value
 
-        return last_falsey
+        return value
 
     def _solve(self, context, depth=0, template=None):
         """Return resolved values for sigils in a template."""
