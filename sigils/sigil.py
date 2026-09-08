@@ -294,10 +294,8 @@ class Sigil:
                 return _UNRESOLVED
 
             final = index == len(keys) - 1
-            if callable(temp):
+            if callable(temp) and final:
                 if protected_path:
-                    return _UNRESOLVED
-                if not final:
                     return _UNRESOLVED
                 temp = self._run_func(temp, [], value, context)
                 if temp is None:
