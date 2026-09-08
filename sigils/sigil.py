@@ -408,7 +408,12 @@ class Sigil:
             if temp is _UNRESOLVED:
                 return _UNRESOLVED
             if temp and callable(temp):
-                temp = temp()
+                if self._provider_callable(temp):
+                    temp = self._run_func(temp, [], value, context)
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
+                else:
+                    temp = temp()
             if temp is None and "-" in key and not literal and not protected_path:
                 temp = (
                     lookup_value.get(key.replace("-", "_"))
