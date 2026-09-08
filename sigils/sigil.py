@@ -457,22 +457,12 @@ class Sigil:
     @staticmethod
     def _split_fallback_expression(expression):
         """Return branches and the operator preceding each later branch."""
-        parts = re.split(r"(\|\|?|)", expression)
-        branches = []
+        parts = re.split(r"(\|\|?)", expression)
+        branches = [parts[0]]
         operators = []
-        current = parts[0]
-        index = 1
-        while index + 1 < len(parts):
-            operator = parts[index]
-            next_branch = parts[index + 1]
-            if operator:
-                branches.append(current)
-                operators.append(operator)
-                current = next_branch
-            else:
-                current += next_branch
-            index += 2
-        branches.append(current)
+        for index in range(1, len(parts), 2):
+            operators.append(parts[index])
+            branches.append(parts[index + 1])
         return branches, operators
 
     def _resolve_expression(self, expression, context):
