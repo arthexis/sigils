@@ -15,7 +15,6 @@ class Sigil:
     """Parse and resolve lazy and eager sigil templates."""
 
     cache = threading.local()
-
     max_depth = 6
     debug = False
 
@@ -25,7 +24,11 @@ class Sigil:
         self.max_depth = max_depth if max_depth is not None else self.__class__.max_depth
         self.debug = debug if debug is not None else self.__class__.debug
         self.pattern = re.compile(r"(?P<eager>%)?\[(?P<expression>.*?)\]")
-        self._template = self._render_template(self._template, self._ambient_context(), eager_only=True)
+        self._template = self._render_template(
+            self._template,
+            self._ambient_context(),
+            eager_only=True,
+        )
 
     @property
     def template(self):
@@ -74,14 +77,26 @@ class Sigil:
             else:
                 value = secret
                 raw_value = value.reveal() if isinstance(value, Secret) else value
-                if context is not None and isinstance(raw_value, str) and depth < self.max_depth and self.pattern.search(raw_value):
-                    raw_value = self._render_template(raw_value, context, sep=sep, depth=depth + 1)
+                if (
+                    context is not None
+                    and isinstance(raw_value, str)
+                    and depth < self.max_depth
+                    and self.pattern.search(raw_value)
+                ):
+                    raw_value = self._render_template(
+                        raw_value,
+                        context,
+                        sep=sep,
+                        depth=depth + 1,
+                    )
                     value = Secret(raw_value) if isinstance(secret, Secret) else raw_value
                 replacement = self._stringify(value, sep)
             rendered = rendered.replace(marker, replacement)
         return rendered
 
-    def _render_template(self, template, context, *, sep="|", depth=0, eager_only=False):
+    def _render_template(
+        self, template, context, *, sep="|", depth=0, eager_only=False
+    ):
         if depth > self.max_depth:
             return template
 
@@ -94,8 +109,18 @@ class Sigil:
                 return match.group(0)
             protected = isinstance(value, Secret)
             raw_value = value.reveal() if protected else value
-            if isinstance(raw_value, str) and depth < self.max_depth and self.pattern.search(raw_value):
-                raw_value = self._render_template(raw_value, context, sep=sep, depth=depth + 1, eager_only=eager_only)
+            if (
+                isinstance(raw_value, str)
+                and depth < self.max_depth
+                and self.pattern.search(raw_value)
+            ):
+                raw_value = self._render_template(
+                    raw_value,
+                    context,
+                    sep=sep,
+                    depth=depth + 1,
+                    eager_only=eager_only,
+                )
                 value = Secret(raw_value) if protected else raw_value
             if eager_only and isinstance(value, Secret):
                 return self._capture_secret(value, depth=depth)
@@ -137,15 +162,22 @@ class Sigil:
         return str(value)
 
     def _resolve_call_argument(self, argument, context):
+        """Resolve one call argument, including comma-delimited tuple values."""
         argument = argument.strip()
+        if "," in argument:
+            return tuple(
+                self._resolve_call_argument(item, context)
+                for item in argument.split(",")
+            )
         if argument.startswith("%"):
-            return argument[1:]
+            return argument[1:].strip()
         resolved = self._resolve_expression(argument, context)
         if resolved is _UNRESOLVED:
             return argument
         return resolved
 
     def _run_structured_call(self, function, argument_sets, context):
+        """Invoke a callable from colon-delimited positional/keyword arguments."""
         args = []
         kwargs = {}
         protected = False
@@ -153,6 +185,17 @@ class Sigil:
             argument = argument.strip()
             if not argument:
                 continue
+
+            explicit_positional = argument.startswith("=")
+            if explicit_positional:
+                raw_value = argument[1:].strip()
+                value = self._resolve_call_argument(raw_value, context)
+                if isinstance(value, Secret):
+                    protected = True
+                    value = value.reveal()
+                args.append(value)
+                continue
+
             if "=" in argument:
                 name, raw_value = argument.split("=", 1)
                 name = name.strip()
@@ -203,6 +246,10 @@ class Sigil:
             return Secret(result)
         return result
 
+    @staticmethod
+    def _provider_callable(value):
+        return callable(value) and bool(getattr(value, "__sigils_safe_callable__", False))
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -240,16 +287,33 @@ class Sigil:
             else:
                 temp = None
             if temp is None and "-" in key and not literal and not protected_path:
-                temp = lookup_value.get(key.replace("-", "_")) if isinstance(lookup_value, dict) else None
-            if temp is None and lookup_value is not None and hasattr(lookup_value, key) and not literal and not protected_path:
+                temp = (
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
+                    else None
+                )
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+                and not protected_path
+            ):
                 temp = getattr(lookup_value, key)
-            if temp is None and lookup_value is not None and "-" in key and hasattr(lookup_value, key.replace("-", "_")) and not literal and not protected_path:
+            if (
+                temp is None
+                and lookup_value is not None
+                and "-" in key
+                and hasattr(lookup_value, key.replace("-", "_"))
+                and not literal
+                and not protected_path
+            ):
                 temp = getattr(lookup_value, key.replace("-", "_"))
             if temp is None:
                 return _UNRESOLVED
             final = index == len(keys) - 1
             if callable(temp) and final:
-                if protected_path:
+                if protected_path and not self._provider_callable(temp):
                     return _UNRESOLVED
                 if invoke_final:
                     temp = self._run_func(temp, [], value, context)
@@ -313,15 +377,32 @@ class Sigil:
                     temp = tool_func
             else:
                 temp = None
-            if protected_path and callable(temp):
+            if protected_path and callable(temp) and not self._provider_callable(temp):
                 return _UNRESOLVED
             if temp and callable(temp):
                 temp = temp()
             if temp is None and "-" in key and not literal and not protected_path:
-                temp = lookup_value.get(key.replace("-", "_")) if isinstance(lookup_value, dict) else None
-            if temp is None and lookup_value is not None and hasattr(lookup_value, key) and not literal and not protected_path:
+                temp = (
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
+                    else None
+                )
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+                and not protected_path
+            ):
                 temp = getattr(lookup_value, key)
-            if temp is None and lookup_value is not None and "-" in key and hasattr(lookup_value, key.replace("-", "_")) and not literal and not protected_path:
+            if (
+                temp is None
+                and lookup_value is not None
+                and "-" in key
+                and hasattr(lookup_value, key.replace("-", "_"))
+                and not literal
+                and not protected_path
+            ):
                 temp = getattr(lookup_value, key.replace("-", "_"))
             if temp is None:
                 return _UNRESOLVED
@@ -342,7 +423,9 @@ class Sigil:
         if value is _UNRESOLVED:
             return True
         raw_value = value.reveal() if isinstance(value, Secret) else value
-        return raw_value is None or (isinstance(raw_value, (set, frozenset)) and not raw_value)
+        return raw_value is None or (
+            isinstance(raw_value, (set, frozenset)) and not raw_value
+        )
 
     def _resolve_single_expression(self, expression, context):
         expression = expression.strip()
@@ -378,15 +461,55 @@ class Sigil:
             return self._resolve_single_expression(expression, context)
         branches, operators = self._split_fallback_expression(expression)
         value = self._resolve_single_expression(branches[0], context)
-        for operator, branch in zip(operators, branches[1:]):
-            should_fallback = not self._fallback_truthy(value) if operator == "|" else self._strict_fallback_missing(value)
-            if should_fallback:
-                value = self._resolve_single_expression(branch, context)
+        for operator, branch in zip(operators, branches[1:], strict=True):
+            should_fallback = (
+                not self._fallback_truthy(value)
+                if operator == "|"
+                else self._strict_fallback_missing(value)
+            )
+            if not should_fallback:
+                return value
+            branch = branch.strip()
+            if branch.startswith(":"):
+                return branch[1:]
+            value = self._resolve_single_expression(branch, context)
         return value
 
-    def results(self, context=None):
+    def _solve(self, context, depth=0, template=None):
         context = {} if context is None else context
-        return {match.group("expression"): self._resolve_expression(match.group("expression"), context) for match in self.pattern.finditer(self._template)}
+        template = self._template if template is None else template
+        solved = {}
+        for match in self.pattern.finditer(template):
+            expression = match.group("expression")
+            value = self._resolve_expression(expression, context)
+            if value is _UNRESOLVED:
+                continue
+            raw_value = value.reveal() if isinstance(value, Secret) else value
+            if (
+                isinstance(raw_value, str)
+                and not isinstance(value, Secret)
+                and depth < self.max_depth
+                and self.pattern.search(raw_value)
+            ):
+                sub_values = self._solve(context, depth + 1, raw_value)
+                if sub_values:
+                    solved[expression] = {
+                        "value": self._render_template(
+                            raw_value,
+                            context,
+                            depth=depth + 1,
+                        ),
+                        "sub_values": sub_values,
+                    }
+                    continue
+            solved[expression] = value
+        return solved
+
+    def results(self, context):
+        return self._redact_value(self._solve(context))
 
     def __mod__(self, context):
         return self.solve(context)
+
+
+__all__ = ["Sigil"]
