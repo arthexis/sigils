@@ -91,17 +91,75 @@ execution environment and late-bound values supplied by a later caller:
     # Project: gway, user: Alice
 
 If an eager sigil cannot be resolved from the current execution context, it is
-preserved intact so that a later explicit solve can still resolve it:
+preserved intact so that a later explicit solve can still resolve it.
 
-.. code-block:: python
 
-    from sigils import Sigil
+Paths, calls, tuples, and fallbacks
+===================================
 
-    template = Sigil("%[available_later]")
-    print(template.template)  # %[available_later]
+Dots and whitespace both support traversal. Whitespace tries traversal first;
+when traversal cannot continue through a normal callable, the historical
+space-separated argument behavior remains available.
 
-    print(template.solve({"available_later": "ready"}))
-    # ready
+.. code-block:: text
+
+    [health.errors]
+    [health errors]
+    [greet name]
+
+The colon is the explicit call operator. Each colon-delimited segment after the
+target is one argument. Whitespace around ``:``, ``,``, and ``=`` is ignored.
+Arguments without ``=`` are positional; ``name=value`` is a keyword argument.
+Multiple colons provide multiple arguments.
+
+.. code-block:: text
+
+    [network ip : wlan0]
+    [network ip : interface=wlan0]
+    [func : first : second]
+    [func : left=first : right=second]
+    [func : first : right=second]
+
+``:=`` explicitly marks a positional argument. It is equivalent to an ordinary
+positional segment, but is useful when the argument text itself contains an
+``=`` and must not be interpreted as a keyword assignment.
+
+.. code-block:: text
+
+    [echo := value]
+    [echo := left=right]
+
+Commas do not create additional function arguments. Comma-separated members
+inside one colon segment are resolved individually and passed as one tuple.
+This also works for keyword arguments.
+
+.. code-block:: text
+
+    [func : a,b]
+    [func : values=a,b,c]
+    [func : first : options=a,b]
+
+Prefixing a call value with ``%`` keeps that value literal rather than resolving
+it from the context.
+
+.. code-block:: text
+
+    [greet : %name]
+
+A final callable is invoked automatically, so ``[now]`` calls a zero-argument
+``now`` value. A trailing colon with no right-hand side instead makes the left
+side a literal constant: ``[now:]`` renders ``now``.
+
+Fallback chains use ``|`` and ``||``. Loose ``|`` advances on any Python-falsey
+value. Strict ``||`` advances only for an unresolved value, ``None``, or an
+empty set/frozenset; values such as ``False``, ``0``, ``""``, ``[]``, ``{}``,
+and ``()`` are retained. A branch beginning with ``:`` is a terminal literal
+fallback.
+
+.. code-block:: text
+
+    [primary|backup|:offline]
+    [primary||backup||:offline]
 
 
 Context
@@ -153,8 +211,8 @@ Built-in tools can be chained as part of an expression:
 
     print(Sigil("[name.upper]") % context)  # ALICE
 
-Functions in the context may also be called. Arguments are separated from the
-function name by spaces:
+Functions in the context may also be called with the historical whitespace
+syntax or the explicit colon syntax:
 
 .. code-block:: python
 
@@ -164,6 +222,7 @@ function name by spaces:
     }
 
     print(Sigil("[greet name]") % context)
+    print(Sigil("[greet : name]") % context)
     # Hello, Alice!
 
 Prefixing an argument with ``%`` treats that argument as a literal value
@@ -171,7 +230,7 @@ instead of resolving it as another sigil:
 
 .. code-block:: python
 
-    print(Sigil("[greet %name]") % context)
+    print(Sigil("[greet : %name]") % context)
     # Hello, name!
 
 Multi-argument tools receive all declared arguments after each argument is
@@ -190,6 +249,17 @@ field in one expression:
 
 The built-in ``sigil`` tool emits canonical lazy syntax, so applying it to
 ``name`` produces ``[name]`` rather than an eager token.
+
+
+Protected namespaces
+====================
+
+``SafeNamespace`` prevents arbitrary attribute/tool fallthrough. A namespace
+provider may explicitly return an approved callable by marking it with
+``__sigils_safe_callable__ = True``. Sigils will invoke only such explicitly
+approved callables when they originate inside a protected namespace. This lets
+integrations expose a controlled command surface without exposing arbitrary
+Python methods.
 
 
 Recursive interpolation
