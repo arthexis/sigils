@@ -226,18 +226,13 @@ class Sigil:
         return result
 
     def _resolve_expression(self, expression, context):
-        """Resolve a dotted sigil expression against context, attributes, and tools."""
-        keys = expression.split(".")
+        """Resolve a sigil path where dots and whitespace are equivalent separators."""
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
         func_args = []
         protected_path = False
 
         for key in keys:
-            if " " in key:
-                key_parts = key.split(" ")
-                key = key_parts[0]
-                func_args = key_parts[1:]
-
             literal = False
             if key.startswith("%"):
                 key = key[1:]
