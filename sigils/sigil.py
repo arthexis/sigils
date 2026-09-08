@@ -3,6 +3,7 @@ import re
 import threading
 
 from .context import Context
+from .namespace import SafeNamespace
 from .secret import Secret
 from .tools import tools
 
@@ -73,23 +74,48 @@ class Sigil:
         """Resolve all remaining sigils with the provided context."""
         context = {} if context is None else context
         rendered = self._render_template(self._template, context, sep=sep)
-        return self._replace_captured(rendered, reveal=True, sep=sep)
+        return self._replace_captured(
+            rendered,
+            reveal=True,
+            sep=sep,
+            context=context,
+        )
 
-    def _capture_secret(self, value):
+    def _capture_secret(self, value, *, depth=0):
         """Store an eager secret out-of-band and return an opaque marker."""
         index = len(self._captured_secrets)
         marker = f"\x00SIGILS_SECRET_{index}\x00"
         while marker in self._template or marker in self._captured_secrets:
             index += 1
             marker = f"\x00SIGILS_SECRET_{index}\x00"
-        self._captured_secrets[marker] = value
+        self._captured_secrets[marker] = (value, depth)
         return marker
 
-    def _replace_captured(self, template, *, reveal, sep="|"):
+    def _replace_captured(self, template, *, reveal, sep="|", context=None):
         """Replace captured-secret markers with redacted or revealed text."""
         rendered = template
-        for marker, secret in self._captured_secrets.items():
-            replacement = self._stringify(secret, sep) if reveal else Secret.REDACTED
+        for marker, (secret, depth) in reversed(self._captured_secrets.items()):
+            if not reveal:
+                replacement = Secret.REDACTED
+            else:
+                value = secret
+                raw_value = value.reveal() if isinstance(value, Secret) else value
+                if (
+                    context is not None
+                    and isinstance(raw_value, str)
+                    and depth < self.max_depth
+                    and self.pattern.search(raw_value)
+                ):
+                    raw_value = self._render_template(
+                        raw_value,
+                        context,
+                        sep=sep,
+                        depth=depth + 1,
+                    )
+                    value = (
+                        Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    )
+                replacement = self._stringify(value, sep)
             rendered = rendered.replace(marker, replacement)
         return rendered
 
@@ -127,7 +153,7 @@ class Sigil:
                 value = Secret(raw_value) if protected else raw_value
 
             if eager_only and isinstance(value, Secret):
-                return self._capture_secret(value)
+                return self._capture_secret(value, depth=depth)
 
             return self._stringify(value, sep)
 
@@ -204,6 +230,7 @@ class Sigil:
         keys = expression.split(".")
         value = context
         func_args = []
+        protected_path = False
 
         for key in keys:
             if " " in key:
@@ -221,6 +248,23 @@ class Sigil:
 
             if literal:
                 temp = key
+            elif isinstance(lookup_value, SafeNamespace):
+                if func_args:
+                    return _UNRESOLVED
+                try:
+                    temp = lookup_value.resolve(key)
+                except KeyError:
+                    return _UNRESOLVED
+                protected_path = True
+            elif protected_path:
+                if func_args:
+                    return _UNRESOLVED
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    temp = lookup_value.get(key)
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    temp = lookup_value[int(key)]
+                else:
+                    return _UNRESOLVED
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
                 if callable(temp):
@@ -240,10 +284,13 @@ class Sigil:
             else:
                 temp = None
 
+            if protected_path and callable(temp):
+                return _UNRESOLVED
+
             if temp and callable(temp):
                 temp = temp()
 
-            if temp is None and "-" in key and not literal:
+            if temp is None and "-" in key and not literal and not protected_path:
                 temp = (
                     lookup_value.get(key.replace("-", "_"))
                     if isinstance(lookup_value, dict)
@@ -255,6 +302,7 @@ class Sigil:
                 and lookup_value is not None
                 and hasattr(lookup_value, key)
                 and not literal
+                and not protected_path
             ):
                 temp = getattr(lookup_value, key)
 
@@ -264,6 +312,7 @@ class Sigil:
                 and "-" in key
                 and hasattr(lookup_value, key.replace("-", "_"))
                 and not literal
+                and not protected_path
             ):
                 temp = getattr(lookup_value, key.replace("-", "_"))
 

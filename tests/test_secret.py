@@ -101,6 +101,30 @@ class TestSecret(unittest.TestCase):
         self.assertNotIn("swordfish", repr(template.__dict__))
         self.assertEqual(template.solve(), "password=swordfish")
 
+    def test_eager_secret_resolves_nested_lazy_with_explicit_context(self):
+        """Resolve lazy sigils inside an eager captured secret during solve()."""
+        early = Secret("[later]")  # noqa: F841 - read through ambient locals
+        template = Sigil("%[early]")
+
+        self.assertEqual(template.template, "[REDACTED]")
+        self.assertEqual(template.solve({"later": "swordfish"}), "swordfish")
+
+    def test_eager_secret_nested_lazy_respects_max_depth(self):
+        """Do not bypass the recursion bound when revealing captured secrets."""
+        early = Secret("[later]")  # noqa: F841 - read through ambient locals
+        template = Sigil("%[early]", max_depth=0)
+
+        self.assertEqual(template.solve({"later": "swordfish"}), "[later]")
+
+    def test_nested_eager_secrets_replace_inner_markers(self):
+        """Reveal nested eager Secret captures without leaking opaque markers."""
+        inner = Secret("swordfish")  # noqa: F841 - read through ambient locals
+        outer = Secret("%[inner]")  # noqa: F841 - read through ambient locals
+        template = Sigil("%[outer]")
+
+        self.assertEqual(template.template, "[REDACTED]")
+        self.assertEqual(template.solve(), "swordfish")
+
 
 if __name__ == "__main__":
     unittest.main()
