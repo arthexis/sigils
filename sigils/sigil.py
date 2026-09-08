@@ -410,8 +410,21 @@ class Sigil:
 
         return value if value is not None else _UNRESOLVED
 
-    def _resolve_expression(self, expression, context):
-        """Resolve dot paths, traversal-first spaces, and forced ``:`` calls."""
+    @staticmethod
+    def _fallback_truthy(value):
+        """Return Python truthiness for a fallback candidate, revealing secrets only locally."""
+        raw_value = value.reveal() if isinstance(value, Secret) else value
+        return bool(raw_value)
+
+    def _resolve_single_expression(self, expression, context):
+        """Resolve one expression without interpreting fallback ``|`` operators."""
+        expression = expression.strip()
+        if not expression:
+            return _UNRESOLVED
+
+        if expression.endswith(":"):
+            return expression[:-1].strip()
+
         if ":" in expression:
             target, arguments = expression.split(":", 1)
             function = self._resolve_traversal(
@@ -430,6 +443,26 @@ class Sigil:
                 return traversed
 
         return self._resolve_legacy_expression(expression, context)
+
+    def _resolve_expression(self, expression, context):
+        """Resolve paths, calls, literals, and left-to-right fallback chains."""
+        if "|" not in expression:
+            return self._resolve_single_expression(expression, context)
+
+        last_falsey = _UNRESOLVED
+        for branch in expression.split("|"):
+            branch = branch.strip()
+            if branch.startswith(":"):
+                return branch[1:]
+
+            value = self._resolve_single_expression(branch, context)
+            if value is _UNRESOLVED:
+                continue
+            if self._fallback_truthy(value):
+                return value
+            last_falsey = value
+
+        return last_falsey
 
     def _solve(self, context, depth=0, template=None):
         """Return resolved values for sigils in a template."""
