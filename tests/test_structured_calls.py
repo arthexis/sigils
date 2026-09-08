@@ -23,7 +23,10 @@ def test_keyword_arguments_use_equals() -> None:
         return f"{interface}:{metric}"
 
     context = {"describe": describe, "wlan": "wlan0", "count": "count"}
-    assert Sigil("[describe : interface=wlan : metric=count]").solve(context) == "wlan0:count"
+    assert (
+        Sigil("[describe : interface=wlan : metric=count]").solve(context)
+        == "wlan0:count"
+    )
 
 
 def test_explicit_positional_marker_colon_equals() -> None:
