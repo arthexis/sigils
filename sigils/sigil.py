@@ -413,6 +413,8 @@ class Sigil:
     @staticmethod
     def _fallback_truthy(value):
         """Return Python truthiness for a loose fallback candidate."""
+        if value is _UNRESOLVED:
+            return False
         raw_value = value.reveal() if isinstance(value, Secret) else value
         return bool(raw_value)
 
