@@ -219,7 +219,7 @@ class Sigil:
         elif num_args == 1:
             result = func(call_value)
         else:
-            result = func(None)
+            result = func()
 
         if protected and result is not None and not isinstance(result, Secret):
             return Secret(result)
@@ -475,9 +475,9 @@ class Sigil:
 
         for operator, branch in zip(operators, branches[1:], strict=True):
             should_fallback = (
-                self._strict_fallback_missing(value)
-                if operator == "||"
-                else value is _UNRESOLVED or not self._fallback_truthy(value)
+                not self._fallback_truthy(value)
+                if operator == "|"
+                else self._strict_fallback_missing(value)
             )
             if not should_fallback:
                 return value
