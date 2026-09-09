@@ -1,0 +1,10 @@
+name: Ruff Autofix
+
+on:
+  pull_request:
+
+jobs:
+  autofix:
+    permissions:
+      contents: write
+    uses: arthexis/ci-base/.github/workflows/ruff-autofix.yml@v1
