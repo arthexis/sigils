@@ -65,7 +65,9 @@ class RenderMixin:
                         sep=sep,
                         depth=depth + 1,
                     )
-                    value = Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    value = (
+                        Secret(raw_value) if isinstance(secret, Secret) else raw_value
+                    )
                 replacement = self._stringify(value, sep)
             rendered = rendered.replace(marker, replacement)
         return rendered
