@@ -1,0 +1,245 @@
+import re
+
+from ..namespace import SafeNamespace
+from ..secret import Secret
+from ..tools import tools
+from .calls import CallMixin
+from .constants import _UNRESOLVED
+
+
+class ResolverMixin(CallMixin):
+    def _resolve_traversal(self, expression, context, *, invoke_final=True):
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
+        value = context
+        protected_path = False
+        for index, key in enumerate(keys):
+            literal = False
+            if key.startswith("%"):
+                key = key[1:]
+                literal = True
+            parent_protected = isinstance(value, Secret)
+            lookup_value = value.reveal() if parent_protected else value
+            if literal:
+                if callable(lookup_value):
+                    return _UNRESOLVED
+                temp = key
+            elif isinstance(lookup_value, SafeNamespace):
+                try:
+                    temp = lookup_value.resolve(key)
+                except KeyError:
+                    return _UNRESOLVED
+                protected_path = True
+            elif protected_path:
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    temp = lookup_value.get(key)
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    temp = lookup_value[int(key)]
+                else:
+                    return _UNRESOLVED
+            elif isinstance(lookup_value, dict) and key in lookup_value:
+                temp = lookup_value.get(key)
+            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                temp = lookup_value[int(key)]
+            elif key in tools:
+                temp = tools[key]
+            else:
+                temp = None
+            if temp is None and "-" in key and not literal and not protected_path:
+                temp = (
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
+                    else None
+                )
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key)
+            if (
+                temp is None
+                and lookup_value is not None
+                and "-" in key
+                and hasattr(lookup_value, key.replace("-", "_"))
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key.replace("-", "_"))
+            if temp is None:
+                return _UNRESOLVED
+            final = index == len(keys) - 1
+            if callable(temp) and final:
+                if protected_path and not self._provider_callable(temp):
+                    return _UNRESOLVED
+                if invoke_final:
+                    temp = self._run_func(temp, [], value, context)
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
+                    if temp is None:
+                        temp = key
+            if parent_protected and not isinstance(temp, Secret):
+                temp = Secret(temp)
+            value = temp
+        return value if value is not None else _UNRESOLVED
+
+    def _resolve_legacy_expression(self, expression, context):
+        keys = expression.split(".")
+        value = context
+        func_args = []
+        protected_path = False
+        for key in keys:
+            if " " in key:
+                key_parts = key.split()
+                key = key_parts[0]
+                func_args = key_parts[1:]
+            literal = False
+            if key.startswith("%"):
+                key = key[1:]
+                literal = True
+            parent_protected = isinstance(value, Secret)
+            lookup_value = value.reveal() if parent_protected else value
+            if literal:
+                temp = key
+            elif isinstance(lookup_value, SafeNamespace):
+                if func_args:
+                    return _UNRESOLVED
+                try:
+                    temp = lookup_value.resolve(key)
+                except KeyError:
+                    return _UNRESOLVED
+                protected_path = True
+            elif protected_path:
+                if func_args:
+                    return _UNRESOLVED
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    temp = lookup_value.get(key)
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    temp = lookup_value[int(key)]
+                else:
+                    return _UNRESOLVED
+            elif isinstance(lookup_value, dict) and key in lookup_value:
+                temp = lookup_value.get(key)
+                if isinstance(temp, SafeNamespace) and func_args:
+                    return _UNRESOLVED
+                if callable(temp):
+                    temp = self._run_func(temp, func_args, value, context)
+                    if temp is None:
+                        temp = key
+            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                temp = lookup_value[int(key)]
+            elif key in tools:
+                tool_func = tools[key]
+                if callable(tool_func):
+                    temp = self._run_func(tool_func, func_args, value, context)
+                    if temp is None:
+                        temp = key
+                else:
+                    temp = tool_func
+            else:
+                temp = None
+            if protected_path and callable(temp) and not self._provider_callable(temp):
+                return _UNRESOLVED
+            if temp is _UNRESOLVED:
+                return _UNRESOLVED
+            if temp and callable(temp):
+                if self._provider_callable(temp):
+                    temp = self._run_func(temp, [], value, context)
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
+                else:
+                    temp = temp()
+            if temp is None and "-" in key and not literal and not protected_path:
+                temp = (
+                    lookup_value.get(key.replace("-", "_"))
+                    if isinstance(lookup_value, dict)
+                    else None
+                )
+            if (
+                temp is None
+                and lookup_value is not None
+                and hasattr(lookup_value, key)
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key)
+            if (
+                temp is None
+                and lookup_value is not None
+                and "-" in key
+                and hasattr(lookup_value, key.replace("-", "_"))
+                and not literal
+                and not protected_path
+            ):
+                temp = getattr(lookup_value, key.replace("-", "_"))
+            if temp is None:
+                return _UNRESOLVED
+            if parent_protected and not isinstance(temp, Secret):
+                temp = Secret(temp)
+            value = temp
+        return value if value is not None else _UNRESOLVED
+
+    @staticmethod
+    def _fallback_truthy(value):
+        if value is _UNRESOLVED:
+            return False
+        raw_value = value.reveal() if isinstance(value, Secret) else value
+        return bool(raw_value)
+
+    @staticmethod
+    def _strict_fallback_missing(value):
+        if value is _UNRESOLVED:
+            return True
+        raw_value = value.reveal() if isinstance(value, Secret) else value
+        return raw_value is None or (
+            isinstance(raw_value, (set, frozenset)) and not raw_value
+        )
+
+    def _resolve_single_expression(self, expression, context):
+        expression = expression.strip()
+        if not expression:
+            return _UNRESOLVED
+        if expression.endswith(":"):
+            return expression[:-1].strip()
+        if ":" in expression:
+            parts = expression.split(":")
+            target = parts[0].strip()
+            function = self._resolve_traversal(target, context, invoke_final=False)
+            if function is _UNRESOLVED or not callable(function):
+                return _UNRESOLVED
+            return self._run_structured_call(function, parts[1:], context)
+        if re.search(r"\s", expression):
+            traversed = self._resolve_traversal(expression, context)
+            if traversed is not _UNRESOLVED:
+                return traversed
+        return self._resolve_legacy_expression(expression, context)
+
+    @staticmethod
+    def _split_fallback_expression(expression):
+        parts = re.split(r"(\|\|?)", expression)
+        branches = [parts[0]]
+        operators = []
+        for index in range(1, len(parts), 2):
+            operators.append(parts[index])
+            branches.append(parts[index + 1])
+        return branches, operators
+
+    def _resolve_expression(self, expression, context):
+        if "|" not in expression:
+            return self._resolve_single_expression(expression, context)
+        branches, operators = self._split_fallback_expression(expression)
+        value = self._resolve_single_expression(branches[0], context)
+        for operator, branch in zip(operators, branches[1:], strict=True):
+            should_fallback = (
+                not self._fallback_truthy(value)
+                if operator == "|"
+                else self._strict_fallback_missing(value)
+            )
+            if not should_fallback:
+                return value
+            branch = branch.strip()
+            if branch.startswith(":"):
+                return branch[1:]
+            value = self._resolve_single_expression(branch, context)
+        return value
