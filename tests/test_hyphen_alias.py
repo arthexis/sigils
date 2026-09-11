@@ -62,25 +62,28 @@ def test_exact_two_word_key_takes_precedence_over_reversed_alias():
     assert Sigil("[beta-alpha]").solve(context) == "beta-alpha"
 
 
-def test_space_separated_two_word_mapping_key_is_alias_fallback():
+def test_space_separated_segments_mean_traversal_not_hyphen_alias():
+    context = {
+        "start": {"server": "nested"},
+        "start_server": "alias",
+    }
+
+    assert Sigil("[start server]").solve(context) == "nested"
+    assert Sigil("[start.server]").solve(context) == "nested"
+
+
+def test_space_does_not_manufacture_a_hyphenated_identifier():
     context = {"start_server": "started"}
 
-    assert Sigil("[start server]").solve(context) == "started"
-    assert Sigil("[server start]").solve(context) == "started"
+    assert Sigil("[start server]").solve(context) == "[start server]"
+    assert Sigil("[start-server]").solve(context) == "started"
 
 
-def test_space_separated_two_word_attribute_is_alias_fallback():
-    context = {"status": _Status()}
+def test_mixed_spaces_and_dots_follow_the_same_traversal():
+    context = {"root": {"alpha": {"beta": "value"}}}
 
-    assert Sigil("[status.start server]").solve(context) == "started"
-    assert Sigil("[status.server start]").solve(context) == "started"
-
-
-def test_space_separated_safe_namespace_key_is_alias_fallback():
-    context = {"node": SafeNamespace({"start_server": "started"})}
-
-    assert Sigil("[node.start server]").solve(context) == "started"
-    assert Sigil("[node.server start]").solve(context) == "started"
+    assert Sigil("[root alpha.beta]").solve(context) == "value"
+    assert Sigil("[root.alpha beta]").solve(context) == "value"
 
 
 def test_normal_space_traversal_wins_over_key_alias():
@@ -90,26 +93,6 @@ def test_normal_space_traversal_wins_over_key_alias():
     }
 
     assert Sigil("[health errors]").solve(context) == "nested"
-
-
-def test_space_alias_does_not_cross_explicit_dot_boundary():
-    context = {
-        "node_server": {"start": "wrong"},
-        "node": {"server_start": "right"},
-    }
-
-    assert Sigil("[node.server start]").solve(context) == "right"
-
-
-def test_existing_space_grammar_wins_before_alias_ambiguity():
-    context = {
-        "root": {
-            "alpha_beta": {"gamma": "left"},
-            "alpha": {"beta_gamma": "right"},
-        }
-    }
-
-    assert Sigil("[root.alpha beta gamma]").solve(context) == "beta_gamma"
 
 
 def test_percent_inside_sigil_is_a_regular_key_character():

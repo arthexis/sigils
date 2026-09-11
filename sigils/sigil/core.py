@@ -1,11 +1,12 @@
 import re
 import threading
 
+from .precedence import ResolutionPrecedenceMixin
 from .render import RenderMixin
 from .resolver import ResolverMixin
 
 
-class Sigil(RenderMixin, ResolverMixin):
+class Sigil(RenderMixin, ResolutionPrecedenceMixin, ResolverMixin):
     """Parse and resolve lazy and eager sigil templates."""
 
     cache = threading.local()
