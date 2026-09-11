@@ -26,6 +26,6 @@ jobs:
       - name: Install project
         run: python -m pip install -e '.[all]'
       - name: Ruff lint
-        run: python -m ruff check sigils tests .ci
+        run: python -m ruff check --config pyproject.toml sigils tests .ci
       - name: Ruff format
-        run: python -m ruff format --check sigils tests .ci
+        run: python -m ruff format --check --config pyproject.toml sigils tests .ci
