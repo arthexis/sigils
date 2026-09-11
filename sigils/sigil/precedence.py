@@ -48,7 +48,11 @@ class ResolutionPrecedenceMixin:
     def _resolve_single_expression(self, expression, context):
         """Prefer whitespace traversal, then greedy calls, then legacy calls."""
         expression = expression.strip()
-        if not expression or self._split_explicit_pass(expression):
+        if (
+            not expression
+            or self._split_explicit_pass(expression)
+            or ":" in expression
+        ):
             return super()._resolve_single_expression(expression, context)
         if not re.search(r"\s", expression):
             return super()._resolve_single_expression(expression, context)
