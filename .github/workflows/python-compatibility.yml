@@ -50,7 +50,7 @@ jobs:
         run: python -m pytest tests
 
   compatibility:
-    name: Python compatibility
+    name: python / Python compatibility
     needs: tests
     if: always() && needs.tests.result != 'skipped'
     runs-on: ubuntu-latest
