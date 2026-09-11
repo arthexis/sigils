@@ -112,7 +112,7 @@ class ResolverMixin(CallMixin):
                     temp = lookup_value[int(key)]
                 except IndexError:
                     return _UNRESOLVED
-            elif key in tools:
+            elif index == 0 and key in tools:
                 temp = tools[key]
             else:
                 temp = None
@@ -186,7 +186,10 @@ class ResolverMixin(CallMixin):
                 if isinstance(lookup_value, dict) and key in lookup_value:
                     temp = lookup_value.get(key)
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                    temp = lookup_value[int(key)]
+                    try:
+                        temp = lookup_value[int(key)]
+                    except IndexError:
+                        return _UNRESOLVED
                 else:
                     temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
@@ -198,7 +201,10 @@ class ResolverMixin(CallMixin):
                     if temp is None:
                         temp = key
             elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                temp = lookup_value[int(key)]
+                try:
+                    temp = lookup_value[int(key)]
+                except IndexError:
+                    return _UNRESOLVED
             elif key in tools:
                 tool_func = tools[key]
                 if callable(tool_func):
