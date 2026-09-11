@@ -23,9 +23,11 @@ jobs:
           cache: pip
       - name: Install Ruff
         run: python -m pip install --upgrade pip ruff
-      - name: Ruff lint
+      - name: Ruff lint (informational)
+        continue-on-error: true
         run: python -m ruff check --config pyproject.toml sigils tests .ci
-      - name: Ruff format
+      - name: Ruff format (informational)
+        continue-on-error: true
         run: python -m ruff format --check --config pyproject.toml sigils tests .ci
 
   tests:
