@@ -122,10 +122,16 @@ def test_double_brackets_are_literal_constants():
     context = {"start_server": "started"}
 
     assert Sigil("[[start_server]]").solve(context) == "start_server"
-    assert Sigil("before [[server start]] after").solve(context) == "before server start after"
+    assert (
+        Sigil("before [[server start]] after").solve(context)
+        == "before server start after"
+    )
 
 
 def test_double_bracket_constant_and_sigil_can_share_template():
     context = {"start_server": "started"}
 
-    assert Sigil("[[start_server]] [start_server]").solve(context) == "start_server started"
+    assert (
+        Sigil("[[start_server]] [start_server]").solve(context)
+        == "start_server started"
+    )
