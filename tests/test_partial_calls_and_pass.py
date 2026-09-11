@@ -56,6 +56,23 @@ def test_explicit_pass_chains_left_to_right():
     assert Sigil("[value - strip - slug]").solve(context) == "alice-smith"
 
 
+def test_explicit_pass_supplies_multiple_missing_leading_arguments():
+    def combine(first, second, suffix):
+        return f"{first}:{second}:{suffix}"
+
+    context = {
+        "first": "alpha",
+        "second": "beta",
+        "suffix": "omega",
+        "combine": combine,
+    }
+
+    assert (
+        Sigil("[first - combine.suffix - second]").solve(context)
+        == "alpha:beta:omega"
+    )
+
+
 class _Record:
     def normalize(self):
         return "member"
