@@ -133,8 +133,8 @@ class TestSigil(unittest.TestCase):
         self.assertEqual(s % self.context, "Hello, Alice!")
 
     def test_callable_with_literal_args(self):
-        """Pass percent-prefixed function arguments as literals."""
-        s = Sigil("[callable_with_args %name]")
+        """Pass double-bracketed function arguments as literals."""
+        s = Sigil("[callable_with_args [[name]]]")
         self.assertEqual(s % self.context, "Hello, name!")
 
     def test_percent_suffix_is_literal_text(self):
@@ -194,7 +194,6 @@ class TestSigil(unittest.TestCase):
 
     def test_reverse(self):
         """Apply the built-in reverse transformation."""
-        self.context["name"] = "Alice"
         s = Sigil("[name.reverse]")
         self.assertEqual(s % self.context, "ecilA")
 
