@@ -1,3 +1,4 @@
+import inspect
 import re
 
 from ..namespace import SafeNamespace
@@ -76,11 +77,50 @@ class ResolverMixin(CallMixin):
             return Secret(result)
         return result if result is not None else _UNRESOLVED
 
+    @staticmethod
+    def _required_positional_count(function):
+        """Return the number of required positional arguments for a callable."""
+        try:
+            parameters = inspect.signature(function).parameters.values()
+        except (TypeError, ValueError):
+            return None
+        positional_kinds = {
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        }
+        return sum(
+            parameter.kind in positional_kinds
+            and parameter.default is inspect.Parameter.empty
+            for parameter in parameters
+        )
+
+    def _run_greedy_call(self, function, argument_keys, context):
+        """Resolve root segments as positional arguments and invoke a callable."""
+        arguments = []
+        protected = False
+        for argument_key in argument_keys:
+            argument = self._resolve_traversal(argument_key, context)
+            if argument is _UNRESOLVED:
+                return _UNRESOLVED
+            if isinstance(argument, Secret):
+                protected = True
+                argument = argument.reveal()
+            arguments.append(argument)
+        try:
+            result = function(*arguments)
+        except Exception:
+            return _UNRESOLVED
+        if protected and result is not None and not isinstance(result, Secret):
+            return Secret(result)
+        return result if result is not None else _UNRESOLVED
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
         protected_path = False
-        for index, key in enumerate(keys):
+        index = 0
+        while index < len(keys):
+            key = keys[index]
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
             bound_method = False
@@ -135,7 +175,22 @@ class ResolverMixin(CallMixin):
                         return _UNRESOLVED
             if temp is None or temp is _UNRESOLVED:
                 return _UNRESOLVED
+
             final = index == len(keys) - 1
+            if index == 0 and callable(temp) and not final and not bound_method:
+                required = self._required_positional_count(temp)
+                if required:
+                    argument_end = index + 1 + required
+                    if argument_end > len(keys):
+                        return _UNRESOLVED
+                    temp = self._run_greedy_call(
+                        temp, keys[index + 1 : argument_end], context
+                    )
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
+                    index = argument_end - 1
+                    final = index == len(keys) - 1
+
             if bound_method:
                 try:
                     temp = temp()
@@ -153,6 +208,7 @@ class ResolverMixin(CallMixin):
             if parent_protected and not isinstance(temp, Secret):
                 temp = Secret(temp)
             value = temp
+            index += 1
         return value if value is not None else _UNRESOLVED
 
     def _resolve_legacy_expression(self, expression, context):
