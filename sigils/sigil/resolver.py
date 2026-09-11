@@ -199,6 +199,8 @@ class ResolverMixin(CallMixin):
             ):
                 required = self._required_positional_count(temp)
                 if required:
+                    if protected_path and not self._provider_callable(temp):
+                        return _UNRESOLVED
                     argument_end = index + 1 + required
                     if argument_end > len(keys):
                         return _UNRESOLVED
