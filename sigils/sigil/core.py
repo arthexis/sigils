@@ -14,6 +14,7 @@ class Sigil(RenderMixin, ResolverMixin):
 
     def __init__(self, template, *, max_depth=None, debug=None):
         self._captured_secrets = {}
+        self._captured_literals = {}
         self._template = str(template)
         self.max_depth = (
             max_depth if max_depth is not None else self.__class__.max_depth

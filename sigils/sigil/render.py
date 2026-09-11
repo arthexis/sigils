@@ -1,4 +1,5 @@
 import inspect
+import re
 
 from ..context import Context
 from ..secret import Secret
@@ -8,7 +9,8 @@ from .constants import _UNRESOLVED
 class RenderMixin:
     @property
     def template(self):
-        return self._replace_captured(self._template, reveal=False)
+        rendered = self._replace_captured(self._template, reveal=False)
+        return self._restore_literals(rendered)
 
     @staticmethod
     def _ambient_context():
@@ -34,7 +36,10 @@ class RenderMixin:
     def solve(self, context=None, sep="|"):
         context = {} if context is None else context
         rendered = self._render_template(self._template, context, sep=sep)
-        return self._replace_captured(rendered, reveal=True, sep=sep, context=context)
+        rendered = self._replace_captured(
+            rendered, reveal=True, sep=sep, context=context
+        )
+        return self._restore_literals(rendered)
 
     def _capture_secret(self, value, *, depth=0):
         index = len(self._captured_secrets)
@@ -44,6 +49,25 @@ class RenderMixin:
             marker = f"\x00SIGILS_SECRET_{index}\x00"
         self._captured_secrets[marker] = (value, depth)
         return marker
+
+    def _protect_literals(self, template):
+        def replace(match):
+            value = match.group(1)
+            index = len(self._captured_literals)
+            marker = f"\x00SIGILS_LITERAL_{index}\x00"
+            while marker in self._template or marker in self._captured_literals:
+                index += 1
+                marker = f"\x00SIGILS_LITERAL_{index}\x00"
+            self._captured_literals[marker] = value
+            return marker
+
+        return re.sub(r"\[\[([^\[\]]*?)\]\]", replace, template)
+
+    def _restore_literals(self, template):
+        rendered = template
+        for marker, value in reversed(self._captured_literals.items()):
+            rendered = rendered.replace(marker, value)
+        return rendered
 
     def _replace_captured(self, template, *, reveal, sep="|", context=None):
         rendered = template
@@ -77,6 +101,7 @@ class RenderMixin:
     ):
         if depth > self.max_depth:
             return template
+        template = self._protect_literals(template)
 
         def replace(match):
             if eager_only and not match.group("eager"):
@@ -142,6 +167,7 @@ class RenderMixin:
     def _solve(self, context, depth=0, template=None):
         context = {} if context is None else context
         template = self._template if template is None else template
+        template = self._protect_literals(template)
         solved = {}
         for match in self.pattern.finditer(template):
             expression = match.group("expression")

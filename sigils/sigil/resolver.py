@@ -28,22 +28,49 @@ class ResolverMixin(CallMixin):
                     aliases.append(alias)
         return tuple(aliases)
 
+    @staticmethod
+    def _space_alias_candidates(expression):
+        """Combine one whitespace-separated pair without crossing explicit dots."""
+        segments = expression.strip().split(".")
+        candidates = []
+        for segment_index, segment in enumerate(segments):
+            words = segment.split()
+            if len(words) < 2:
+                continue
+            for word_index in range(len(words) - 1):
+                left = words[word_index]
+                right = words[word_index + 1]
+                merged_words = [
+                    *words[:word_index],
+                    f"{left}-{right}",
+                    *words[word_index + 2 :],
+                ]
+                candidate_segments = [*segments]
+                candidate_segments[segment_index] = ".".join(merged_words)
+                candidate = ".".join(candidate_segments)
+                if candidate not in candidates:
+                    candidates.append(candidate)
+        return tuple(candidates)
+
+    def _resolve_space_alias(self, expression, context, *, invoke_final=True):
+        """Resolve a single unambiguous adjacent-word merge as a key alias."""
+        matches = []
+        for candidate in self._space_alias_candidates(expression):
+            value = self._resolve_traversal(candidate, context, invoke_final=False)
+            if value is not _UNRESOLVED:
+                matches.append(candidate)
+        if len(matches) != 1:
+            return _UNRESOLVED
+        return self._resolve_traversal(matches[0], context, invoke_final=invoke_final)
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
         protected_path = False
         for index, key in enumerate(keys):
-            literal = False
-            if key.startswith("%"):
-                key = key[1:]
-                literal = True
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
-            if literal:
-                if callable(lookup_value):
-                    return _UNRESOLVED
-                temp = key
-            elif isinstance(lookup_value, SafeNamespace):
+            if isinstance(lookup_value, SafeNamespace):
                 temp = _UNRESOLVED
                 for candidate in (key, *self._key_aliases(key)):
                     try:
@@ -69,17 +96,12 @@ class ResolverMixin(CallMixin):
                 temp = tools[key]
             else:
                 temp = None
-            if temp is None and not literal and isinstance(lookup_value, dict):
+            if temp is None and isinstance(lookup_value, dict):
                 for alias in self._key_aliases(key):
                     if alias in lookup_value:
                         temp = lookup_value.get(alias)
                         break
-            if (
-                temp is None
-                and lookup_value is not None
-                and not literal
-                and not protected_path
-            ):
+            if temp is None and lookup_value is not None and not protected_path:
                 for candidate in (key, *self._key_aliases(key)):
                     if hasattr(lookup_value, candidate):
                         temp = getattr(lookup_value, candidate)
@@ -111,15 +133,9 @@ class ResolverMixin(CallMixin):
                 key_parts = key.split()
                 key = key_parts[0]
                 func_args = key_parts[1:]
-            literal = False
-            if key.startswith("%"):
-                key = key[1:]
-                literal = True
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
-            if literal:
-                temp = key
-            elif isinstance(lookup_value, SafeNamespace):
+            if isinstance(lookup_value, SafeNamespace):
                 if func_args:
                     return _UNRESOLVED
                 temp = _UNRESOLVED
@@ -161,7 +177,7 @@ class ResolverMixin(CallMixin):
                     temp = tool_func
             else:
                 temp = None
-            if temp is None and not literal and isinstance(lookup_value, dict):
+            if temp is None and isinstance(lookup_value, dict):
                 for alias in self._key_aliases(key):
                     if alias not in lookup_value:
                         continue
@@ -184,12 +200,7 @@ class ResolverMixin(CallMixin):
                         return _UNRESOLVED
                 else:
                     temp = temp()
-            if (
-                temp is None
-                and lookup_value is not None
-                and not literal
-                and not protected_path
-            ):
+            if temp is None and lookup_value is not None and not protected_path:
                 for candidate in (key, *self._key_aliases(key)):
                     if hasattr(lookup_value, candidate):
                         temp = getattr(lookup_value, candidate)
@@ -227,6 +238,10 @@ class ResolverMixin(CallMixin):
             parts = expression.split(":")
             target = parts[0].strip()
             function = self._resolve_traversal(target, context, invoke_final=False)
+            if function is _UNRESOLVED and re.search(r"\s", target):
+                function = self._resolve_space_alias(
+                    target, context, invoke_final=False
+                )
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
@@ -234,6 +249,10 @@ class ResolverMixin(CallMixin):
             traversed = self._resolve_traversal(expression, context)
             if traversed is not _UNRESOLVED:
                 return traversed
+            legacy = self._resolve_legacy_expression(expression, context)
+            if legacy is not _UNRESOLVED:
+                return legacy
+            return self._resolve_space_alias(expression, context)
         return self._resolve_legacy_expression(expression, context)
 
     @staticmethod
