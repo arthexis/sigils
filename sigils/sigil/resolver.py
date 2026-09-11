@@ -40,8 +40,6 @@ class ResolverMixin(CallMixin):
             for word_index in range(len(words) - 1):
                 left = words[word_index]
                 right = words[word_index + 1]
-                if left.startswith("%") or right.startswith("%"):
-                    continue
                 merged_words = [
                     *words[:word_index],
                     f"{left}-{right}",
@@ -70,17 +68,9 @@ class ResolverMixin(CallMixin):
         value = context
         protected_path = False
         for index, key in enumerate(keys):
-            literal = False
-            if key.startswith("%"):
-                key = key[1:]
-                literal = True
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
-            if literal:
-                if callable(lookup_value):
-                    return _UNRESOLVED
-                temp = key
-            elif isinstance(lookup_value, SafeNamespace):
+            if isinstance(lookup_value, SafeNamespace):
                 temp = _UNRESOLVED
                 for candidate in (key, *self._key_aliases(key)):
                     try:
@@ -106,17 +96,12 @@ class ResolverMixin(CallMixin):
                 temp = tools[key]
             else:
                 temp = None
-            if temp is None and not literal and isinstance(lookup_value, dict):
+            if temp is None and isinstance(lookup_value, dict):
                 for alias in self._key_aliases(key):
                     if alias in lookup_value:
                         temp = lookup_value.get(alias)
                         break
-            if (
-                temp is None
-                and lookup_value is not None
-                and not literal
-                and not protected_path
-            ):
+            if temp is None and lookup_value is not None and not protected_path:
                 for candidate in (key, *self._key_aliases(key)):
                     if hasattr(lookup_value, candidate):
                         temp = getattr(lookup_value, candidate)
@@ -148,15 +133,9 @@ class ResolverMixin(CallMixin):
                 key_parts = key.split()
                 key = key_parts[0]
                 func_args = key_parts[1:]
-            literal = False
-            if key.startswith("%"):
-                key = key[1:]
-                literal = True
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
-            if literal:
-                temp = key
-            elif isinstance(lookup_value, SafeNamespace):
+            if isinstance(lookup_value, SafeNamespace):
                 if func_args:
                     return _UNRESOLVED
                 temp = _UNRESOLVED
@@ -198,7 +177,7 @@ class ResolverMixin(CallMixin):
                     temp = tool_func
             else:
                 temp = None
-            if temp is None and not literal and isinstance(lookup_value, dict):
+            if temp is None and isinstance(lookup_value, dict):
                 for alias in self._key_aliases(key):
                     if alias not in lookup_value:
                         continue
@@ -221,12 +200,7 @@ class ResolverMixin(CallMixin):
                         return _UNRESOLVED
                 else:
                     temp = temp()
-            if (
-                temp is None
-                and lookup_value is not None
-                and not literal
-                and not protected_path
-            ):
+            if temp is None and lookup_value is not None and not protected_path:
                 for candidate in (key, *self._key_aliases(key)):
                     if hasattr(lookup_value, candidate):
                         temp = getattr(lookup_value, candidate)
