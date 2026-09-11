@@ -273,10 +273,10 @@ class ResolverMixin(CallMixin):
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
+        traversed = self._resolve_traversal(expression, context)
+        if traversed is not _UNRESOLVED:
+            return traversed
         if re.search(r"\s", expression):
-            traversed = self._resolve_traversal(expression, context)
-            if traversed is not _UNRESOLVED:
-                return traversed
             legacy = self._resolve_legacy_expression(expression, context)
             if legacy is not _UNRESOLVED:
                 return legacy
