@@ -10,8 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install Ruff
+        run: python -m pip install --upgrade pip ruff
+      - name: Ruff lint
+        run: python -m ruff check --config pyproject.toml sigils tests .ci
+      - name: Ruff format
+        run: python -m ruff format --check --config pyproject.toml sigils tests .ci
+
   tests:
     name: Tests (Python ${{ matrix.python-version }})
+    needs: quality
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,7 +52,7 @@ jobs:
   compatibility:
     name: Python compatibility
     needs: tests
-    if: always()
+    if: always() && needs.tests.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - name: Require all Python versions
