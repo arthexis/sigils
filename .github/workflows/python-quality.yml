@@ -1,4 +1,4 @@
-name: python / Quality
+name: Python Quality
 
 on:
   pull_request:

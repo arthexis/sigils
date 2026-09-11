@@ -1,4 +1,4 @@
-name: python / Package
+name: Python Package
 
 on:
   pull_request:
