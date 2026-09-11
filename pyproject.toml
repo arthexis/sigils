@@ -7,7 +7,7 @@ name = "gway-sigils"
 version = "0.4.7"
 description = "Solve templates with [sigils]."
 readme = "README.rst"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = "LicenseRef-ARTHEXIS"
 license-files = ["LICENSE"]
 keywords = ["utils", "sigils", "string", "text", "meta-text", "context", "template"]
@@ -21,6 +21,7 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "Environment :: Console",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -56,7 +57,7 @@ include = ["sigils*"]
 exclude = ["samples*", "tests*"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py310"
 line-length = 88
 
 [tool.ruff.lint]
