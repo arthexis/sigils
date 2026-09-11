@@ -70,7 +70,7 @@ class ResolverMixin(CallMixin):
         argument = value.reveal() if protected else value
         try:
             result = function(argument)
-        except (TypeError, ValueError):
+        except Exception:
             return _UNRESOLVED
         if protected and result is not None and not isinstance(result, Secret):
             return Secret(result)
@@ -99,13 +99,19 @@ class ResolverMixin(CallMixin):
                 if isinstance(lookup_value, dict) and key in lookup_value:
                     temp = lookup_value.get(key)
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                    temp = lookup_value[int(key)]
+                    try:
+                        temp = lookup_value[int(key)]
+                    except IndexError:
+                        return _UNRESOLVED
                 else:
                     temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
             elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                temp = lookup_value[int(key)]
+                try:
+                    temp = lookup_value[int(key)]
+                except IndexError:
+                    return _UNRESOLVED
             elif key in tools:
                 temp = tools[key]
             else:
@@ -122,9 +128,7 @@ class ResolverMixin(CallMixin):
                         bound_method = callable(temp)
                         break
             if temp is None and index > 0 and not protected_path:
-                continuation = self._resolve_traversal(
-                    key, context, invoke_final=False
-                )
+                continuation = self._resolve_traversal(key, context, invoke_final=False)
                 if callable(continuation):
                     temp = self._run_continuation(continuation, value)
                     if temp is _UNRESOLVED:
