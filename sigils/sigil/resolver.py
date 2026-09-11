@@ -28,6 +28,43 @@ class ResolverMixin(CallMixin):
                     aliases.append(alias)
         return tuple(aliases)
 
+    @staticmethod
+    def _space_alias_candidates(expression):
+        """Combine one whitespace-separated pair without crossing explicit dots."""
+        segments = expression.strip().split(".")
+        candidates = []
+        for segment_index, segment in enumerate(segments):
+            words = segment.split()
+            if len(words) < 2:
+                continue
+            for word_index in range(len(words) - 1):
+                left = words[word_index]
+                right = words[word_index + 1]
+                if left.startswith("%") or right.startswith("%"):
+                    continue
+                merged_words = [
+                    *words[:word_index],
+                    f"{left}-{right}",
+                    *words[word_index + 2 :],
+                ]
+                candidate_segments = [*segments]
+                candidate_segments[segment_index] = ".".join(merged_words)
+                candidate = ".".join(candidate_segments)
+                if candidate not in candidates:
+                    candidates.append(candidate)
+        return tuple(candidates)
+
+    def _resolve_space_alias(self, expression, context, *, invoke_final=True):
+        """Resolve a single unambiguous adjacent-word merge as a key alias."""
+        matches = []
+        for candidate in self._space_alias_candidates(expression):
+            value = self._resolve_traversal(candidate, context, invoke_final=False)
+            if value is not _UNRESOLVED:
+                matches.append(candidate)
+        if len(matches) != 1:
+            return _UNRESOLVED
+        return self._resolve_traversal(matches[0], context, invoke_final=invoke_final)
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -227,6 +264,8 @@ class ResolverMixin(CallMixin):
             parts = expression.split(":")
             target = parts[0].strip()
             function = self._resolve_traversal(target, context, invoke_final=False)
+            if function is _UNRESOLVED and re.search(r"\s", target):
+                function = self._resolve_space_alias(target, context, invoke_final=False)
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
@@ -234,6 +273,10 @@ class ResolverMixin(CallMixin):
             traversed = self._resolve_traversal(expression, context)
             if traversed is not _UNRESOLVED:
                 return traversed
+            legacy = self._resolve_legacy_expression(expression, context)
+            if legacy is not _UNRESOLVED:
+                return legacy
+            return self._resolve_space_alias(expression, context)
         return self._resolve_legacy_expression(expression, context)
 
     @staticmethod
