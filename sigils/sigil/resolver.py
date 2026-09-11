@@ -8,6 +8,26 @@ from .constants import _UNRESOLVED
 
 
 class ResolverMixin(CallMixin):
+    @staticmethod
+    def _key_aliases(key):
+        """Return non-exact separator and reversed two-word aliases for a key."""
+        aliases = []
+        if "-" in key:
+            separator_alias = key.replace("-", "_")
+        elif "_" in key:
+            separator_alias = key.replace("_", "-")
+        else:
+            separator_alias = None
+        if separator_alias and separator_alias != key:
+            aliases.append(separator_alias)
+
+        words = key.replace("-", "_").split("_")
+        if len(words) == 2 and all(words):
+            for alias in (f"{words[1]}_{words[0]}", f"{words[1]}-{words[0]}"):
+                if alias != key and alias not in aliases:
+                    aliases.append(alias)
+        return tuple(aliases)
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -24,9 +44,14 @@ class ResolverMixin(CallMixin):
                     return _UNRESOLVED
                 temp = key
             elif isinstance(lookup_value, SafeNamespace):
-                try:
-                    temp = lookup_value.resolve(key)
-                except KeyError:
+                temp = _UNRESOLVED
+                for candidate in (key, *self._key_aliases(key)):
+                    try:
+                        temp = lookup_value.resolve(candidate)
+                        break
+                    except KeyError:
+                        continue
+                if temp is _UNRESOLVED:
                     return _UNRESOLVED
                 protected_path = True
             elif protected_path:
@@ -35,7 +60,7 @@ class ResolverMixin(CallMixin):
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
                     temp = lookup_value[int(key)]
                 else:
-                    return _UNRESOLVED
+                    temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
             elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
@@ -44,29 +69,21 @@ class ResolverMixin(CallMixin):
                 temp = tools[key]
             else:
                 temp = None
-            if temp is None and "-" in key and not literal and not protected_path:
-                temp = (
-                    lookup_value.get(key.replace("-", "_"))
-                    if isinstance(lookup_value, dict)
-                    else None
-                )
+            if temp is None and not literal and isinstance(lookup_value, dict):
+                for alias in self._key_aliases(key):
+                    if alias in lookup_value:
+                        temp = lookup_value.get(alias)
+                        break
             if (
                 temp is None
                 and lookup_value is not None
-                and hasattr(lookup_value, key)
                 and not literal
                 and not protected_path
             ):
-                temp = getattr(lookup_value, key)
-            if (
-                temp is None
-                and lookup_value is not None
-                and "-" in key
-                and hasattr(lookup_value, key.replace("-", "_"))
-                and not literal
-                and not protected_path
-            ):
-                temp = getattr(lookup_value, key.replace("-", "_"))
+                for candidate in (key, *self._key_aliases(key)):
+                    if hasattr(lookup_value, candidate):
+                        temp = getattr(lookup_value, candidate)
+                        break
             if temp is None:
                 return _UNRESOLVED
             final = index == len(keys) - 1
@@ -105,9 +122,14 @@ class ResolverMixin(CallMixin):
             elif isinstance(lookup_value, SafeNamespace):
                 if func_args:
                     return _UNRESOLVED
-                try:
-                    temp = lookup_value.resolve(key)
-                except KeyError:
+                temp = _UNRESOLVED
+                for candidate in (key, *self._key_aliases(key)):
+                    try:
+                        temp = lookup_value.resolve(candidate)
+                        break
+                    except KeyError:
+                        continue
+                if temp is _UNRESOLVED:
                     return _UNRESOLVED
                 protected_path = True
             elif protected_path:
@@ -118,7 +140,7 @@ class ResolverMixin(CallMixin):
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
                     temp = lookup_value[int(key)]
                 else:
-                    return _UNRESOLVED
+                    temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
                 if isinstance(temp, SafeNamespace) and func_args:
@@ -139,6 +161,18 @@ class ResolverMixin(CallMixin):
                     temp = tool_func
             else:
                 temp = None
+            if temp is None and not literal and isinstance(lookup_value, dict):
+                for alias in self._key_aliases(key):
+                    if alias not in lookup_value:
+                        continue
+                    temp = lookup_value.get(alias)
+                    if isinstance(temp, SafeNamespace) and func_args:
+                        return _UNRESOLVED
+                    if callable(temp):
+                        temp = self._run_func(temp, func_args, value, context)
+                        if temp is None:
+                            temp = key
+                    break
             if protected_path and callable(temp) and not self._provider_callable(temp):
                 return _UNRESOLVED
             if temp is _UNRESOLVED:
@@ -150,29 +184,16 @@ class ResolverMixin(CallMixin):
                         return _UNRESOLVED
                 else:
                     temp = temp()
-            if temp is None and "-" in key and not literal and not protected_path:
-                temp = (
-                    lookup_value.get(key.replace("-", "_"))
-                    if isinstance(lookup_value, dict)
-                    else None
-                )
             if (
                 temp is None
                 and lookup_value is not None
-                and hasattr(lookup_value, key)
                 and not literal
                 and not protected_path
             ):
-                temp = getattr(lookup_value, key)
-            if (
-                temp is None
-                and lookup_value is not None
-                and "-" in key
-                and hasattr(lookup_value, key.replace("-", "_"))
-                and not literal
-                and not protected_path
-            ):
-                temp = getattr(lookup_value, key.replace("-", "_"))
+                for candidate in (key, *self._key_aliases(key)):
+                    if hasattr(lookup_value, candidate):
+                        temp = getattr(lookup_value, candidate)
+                        break
             if temp is None:
                 return _UNRESOLVED
             if parent_protected and not isinstance(temp, Secret):
