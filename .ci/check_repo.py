@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 
 @dataclass(frozen=True)
@@ -51,10 +55,13 @@ def _check_tests(root: Path) -> CheckResult:
 
 
 def _check_workflow(root: Path) -> CheckResult:
-    workflow = root / ".github" / "workflows" / "ci.yml"
-    if not workflow.is_file():
-        return CheckResult("workflow", False, "missing .github/workflows/ci.yml")
-    return CheckResult("workflow", True, "CI workflow present")
+    workflows = root / ".github" / "workflows"
+    if not workflows.is_dir():
+        return CheckResult("workflow", False, "missing .github/workflows directory")
+    workflow_files = sorted((*workflows.glob("*.yml"), *workflows.glob("*.yaml")))
+    if not workflow_files:
+        return CheckResult("workflow", False, "no GitHub Actions workflows found")
+    return CheckResult("workflow", True, f"{len(workflow_files)} workflow(s) present")
 
 
 def _check_readme(root: Path) -> CheckResult:
