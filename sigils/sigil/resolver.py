@@ -6,6 +6,7 @@ from ..secret import Secret
 from ..tools import tools
 from .calls import CallMixin
 from .constants import _UNRESOLVED
+from .pending import PendingCall
 
 
 class ResolverMixin(CallMixin):
@@ -94,18 +95,25 @@ class ResolverMixin(CallMixin):
             for parameter in parameters
         )
 
-    def _run_greedy_call(self, function, argument_keys, context):
-        """Resolve root segments as positional arguments and invoke a callable."""
+    def _resolve_argument_keys(self, argument_keys, context):
+        """Resolve positional argument keys from the root context."""
         arguments = []
         protected = False
         for argument_key in argument_keys:
             argument = self._resolve_traversal(argument_key, context)
-            if argument is _UNRESOLVED:
-                return _UNRESOLVED
+            if argument is _UNRESOLVED or isinstance(argument, PendingCall):
+                return _UNRESOLVED, False
             if isinstance(argument, Secret):
                 protected = True
                 argument = argument.reveal()
             arguments.append(argument)
+        return tuple(arguments), protected
+
+    def _run_greedy_call(self, function, argument_keys, context):
+        """Resolve root segments as positional arguments and invoke a callable."""
+        arguments, protected = self._resolve_argument_keys(argument_keys, context)
+        if arguments is _UNRESOLVED:
+            return _UNRESOLVED
         try:
             result = function(*arguments)
         except Exception:
@@ -114,11 +122,72 @@ class ResolverMixin(CallMixin):
             return Secret(result)
         return result if result is not None else _UNRESOLVED
 
+    def _make_pending_call(self, function, argument_keys, missing, context):
+        """Capture a callable whose leading positional inputs are still missing."""
+        arguments, protected = self._resolve_argument_keys(argument_keys, context)
+        if arguments is _UNRESOLVED:
+            return _UNRESOLVED
+        return PendingCall(
+            function=function,
+            trailing_args=arguments,
+            missing=missing,
+            protected=protected,
+        )
+
+    @staticmethod
+    def _consume_pending(pending, value):
+        """Pass one value into a pending call and invoke it when complete."""
+        protected = isinstance(value, Secret)
+        argument = value.reveal() if protected else value
+        try:
+            result = pending.consume(argument, protected=protected)
+        except Exception:
+            return _UNRESOLVED
+        if isinstance(result, PendingCall):
+            return result
+        value, protected_result = result
+        if value is None:
+            return _UNRESOLVED
+        if protected_result and not isinstance(value, Secret):
+            return Secret(value)
+        return value
+
+    @staticmethod
+    def _split_explicit_pass(expression):
+        """Split only standalone dash tokens; identifier hyphens remain untouched."""
+        if not re.search(r"\s+-\s+", expression):
+            return None
+        return [part.strip() for part in re.split(r"\s+-\s+", expression)]
+
+    def _resolve_explicit_pass(self, expression, context):
+        """Resolve a left-to-right explicit value-passing chain."""
+        parts = self._split_explicit_pass(expression)
+        if not parts or any(not part for part in parts):
+            return _UNRESOLVED
+        value = self._resolve_single_expression(parts[0], context)
+        if value is _UNRESOLVED:
+            return _UNRESOLVED
+        for target_expression in parts[1:]:
+            target = self._resolve_traversal(
+                target_expression, context, invoke_final=False
+            )
+            if target is _UNRESOLVED:
+                return _UNRESOLVED
+            if isinstance(target, PendingCall):
+                value = self._consume_pending(target, value)
+            elif callable(target):
+                value = self._run_continuation(target, value)
+            else:
+                return _UNRESOLVED
+            if value is _UNRESOLVED:
+                return _UNRESOLVED
+        return value
+
     def _greedy_root_requires_arguments(self, expression, context):
-        """Return whether a dotted expression starts with an argument-taking callable."""
-        if "." not in expression:
+        """Return whether a path starts with an argument-taking callable."""
+        if "." not in expression and not re.search(r"\s", expression):
             return False
-        first = expression.split(".", 1)[0].strip()
+        first = re.split(r"[.\s]+", expression.strip(), maxsplit=1)[0]
         if not first:
             return False
         function = self._resolve_traversal(first, context, invoke_final=False)
@@ -130,7 +199,7 @@ class ResolverMixin(CallMixin):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
         protected_path = False
-        greedy_path = "." in expression
+        greedy_path = "." in expression or bool(re.search(r"\s", expression))
         index = 0
         while index < len(keys):
             key = keys[index]
@@ -201,9 +270,15 @@ class ResolverMixin(CallMixin):
                 if required:
                     if protected_path and not self._provider_callable(temp):
                         return _UNRESOLVED
+                    available = len(keys) - index - 1
+                    if available < required:
+                        return self._make_pending_call(
+                            temp,
+                            keys[index + 1 :],
+                            required - available,
+                            context,
+                        )
                     argument_end = index + 1 + required
-                    if argument_end > len(keys):
-                        return _UNRESOLVED
                     temp = self._run_greedy_call(
                         temp, keys[index + 1 : argument_end], context
                     )
@@ -347,29 +422,27 @@ class ResolverMixin(CallMixin):
         expression = expression.strip()
         if not expression:
             return _UNRESOLVED
+        if self._split_explicit_pass(expression):
+            value = self._resolve_explicit_pass(expression, context)
+            return _UNRESOLVED if isinstance(value, PendingCall) else value
         if expression.endswith(":"):
             return expression[:-1].strip()
         if ":" in expression:
             parts = expression.split(":")
             target = parts[0].strip()
             function = self._resolve_traversal(target, context, invoke_final=False)
-            if function is _UNRESOLVED and re.search(r"\s", target):
-                function = self._resolve_space_alias(
-                    target, context, invoke_final=False
-                )
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
         traversed = self._resolve_traversal(expression, context)
+        if isinstance(traversed, PendingCall):
+            return _UNRESOLVED
         if traversed is not _UNRESOLVED:
             return traversed
         if self._greedy_root_requires_arguments(expression, context):
             return _UNRESOLVED
         if re.search(r"\s", expression):
-            legacy = self._resolve_legacy_expression(expression, context)
-            if legacy is not _UNRESOLVED:
-                return legacy
-            return self._resolve_space_alias(expression, context)
+            return self._resolve_legacy_expression(expression, context)
         return self._resolve_legacy_expression(expression, context)
 
     @staticmethod
