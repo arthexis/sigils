@@ -31,3 +31,5 @@ jobs:
       - name: Ruff format
         continue-on-error: true
         run: python -m ruff format --check --config pyproject.toml sigils tests .ci
+
+# CI retrigger marker; no workflow behavior change.
