@@ -265,7 +265,9 @@ class ResolverMixin(CallMixin):
             target = parts[0].strip()
             function = self._resolve_traversal(target, context, invoke_final=False)
             if function is _UNRESOLVED and re.search(r"\s", target):
-                function = self._resolve_space_alias(target, context, invoke_final=False)
+                function = self._resolve_space_alias(
+                    target, context, invoke_final=False
+                )
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
