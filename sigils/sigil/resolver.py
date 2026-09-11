@@ -63,6 +63,19 @@ class ResolverMixin(CallMixin):
             return _UNRESOLVED
         return self._resolve_traversal(matches[0], context, invoke_final=invoke_final)
 
+    @staticmethod
+    def _run_continuation(function, value):
+        """Pass the current resolved value into a newly resolved callable."""
+        protected = isinstance(value, Secret)
+        argument = value.reveal() if protected else value
+        try:
+            result = function(argument)
+        except Exception:
+            return _UNRESOLVED
+        if protected and result is not None and not isinstance(result, Secret):
+            return Secret(result)
+        return result if result is not None else _UNRESOLVED
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -70,6 +83,7 @@ class ResolverMixin(CallMixin):
         for index, key in enumerate(keys):
             parent_protected = isinstance(value, Secret)
             lookup_value = value.reveal() if parent_protected else value
+            bound_method = False
             if isinstance(lookup_value, SafeNamespace):
                 temp = _UNRESOLVED
                 for candidate in (key, *self._key_aliases(key)):
@@ -85,14 +99,20 @@ class ResolverMixin(CallMixin):
                 if isinstance(lookup_value, dict) and key in lookup_value:
                     temp = lookup_value.get(key)
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                    temp = lookup_value[int(key)]
+                    try:
+                        temp = lookup_value[int(key)]
+                    except IndexError:
+                        return _UNRESOLVED
                 else:
                     temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
                 temp = lookup_value.get(key)
             elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                temp = lookup_value[int(key)]
-            elif key in tools:
+                try:
+                    temp = lookup_value[int(key)]
+                except IndexError:
+                    return _UNRESOLVED
+            elif index == 0 and key in tools:
                 temp = tools[key]
             else:
                 temp = None
@@ -105,11 +125,23 @@ class ResolverMixin(CallMixin):
                 for candidate in (key, *self._key_aliases(key)):
                     if hasattr(lookup_value, candidate):
                         temp = getattr(lookup_value, candidate)
+                        bound_method = callable(temp)
                         break
-            if temp is None:
+            if temp is None and index > 0 and not protected_path:
+                continuation = self._resolve_traversal(key, context, invoke_final=False)
+                if callable(continuation):
+                    temp = self._run_continuation(continuation, value)
+                    if temp is _UNRESOLVED:
+                        return _UNRESOLVED
+            if temp is None or temp is _UNRESOLVED:
                 return _UNRESOLVED
             final = index == len(keys) - 1
-            if callable(temp) and final:
+            if bound_method:
+                try:
+                    temp = temp()
+                except (TypeError, ValueError):
+                    return _UNRESOLVED
+            elif callable(temp) and final:
                 if protected_path and not self._provider_callable(temp):
                     return _UNRESOLVED
                 if invoke_final:
@@ -154,7 +186,10 @@ class ResolverMixin(CallMixin):
                 if isinstance(lookup_value, dict) and key in lookup_value:
                     temp = lookup_value.get(key)
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                    temp = lookup_value[int(key)]
+                    try:
+                        temp = lookup_value[int(key)]
+                    except IndexError:
+                        return _UNRESOLVED
                 else:
                     temp = None
             elif isinstance(lookup_value, dict) and key in lookup_value:
@@ -166,7 +201,10 @@ class ResolverMixin(CallMixin):
                     if temp is None:
                         temp = key
             elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                temp = lookup_value[int(key)]
+                try:
+                    temp = lookup_value[int(key)]
+                except IndexError:
+                    return _UNRESOLVED
             elif key in tools:
                 tool_func = tools[key]
                 if callable(tool_func):
@@ -245,10 +283,10 @@ class ResolverMixin(CallMixin):
             if function is _UNRESOLVED or not callable(function):
                 return _UNRESOLVED
             return self._run_structured_call(function, parts[1:], context)
+        traversed = self._resolve_traversal(expression, context)
+        if traversed is not _UNRESOLVED:
+            return traversed
         if re.search(r"\s", expression):
-            traversed = self._resolve_traversal(expression, context)
-            if traversed is not _UNRESOLVED:
-                return traversed
             legacy = self._resolve_legacy_expression(expression, context)
             if legacy is not _UNRESOLVED:
                 return legacy
