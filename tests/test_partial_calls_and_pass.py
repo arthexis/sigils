@@ -68,8 +68,7 @@ def test_explicit_pass_supplies_multiple_missing_leading_arguments():
     }
 
     assert (
-        Sigil("[first - combine.suffix - second]").solve(context)
-        == "alpha:beta:omega"
+        Sigil("[first - combine.suffix - second]").solve(context) == "alpha:beta:omega"
     )
 
 
