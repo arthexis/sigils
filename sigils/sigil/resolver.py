@@ -114,10 +114,23 @@ class ResolverMixin(CallMixin):
             return Secret(result)
         return result if result is not None else _UNRESOLVED
 
+    def _greedy_root_requires_arguments(self, expression, context):
+        """Return whether a dotted expression starts with an argument-taking callable."""
+        if "." not in expression:
+            return False
+        first = expression.split(".", 1)[0].strip()
+        if not first:
+            return False
+        function = self._resolve_traversal(first, context, invoke_final=False)
+        if function is _UNRESOLVED or not callable(function):
+            return False
+        return bool(self._required_positional_count(function))
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
         protected_path = False
+        greedy_path = "." in expression
         index = 0
         while index < len(keys):
             key = keys[index]
@@ -177,7 +190,13 @@ class ResolverMixin(CallMixin):
                 return _UNRESOLVED
 
             final = index == len(keys) - 1
-            if index == 0 and callable(temp) and not final and not bound_method:
+            if (
+                greedy_path
+                and index == 0
+                and callable(temp)
+                and not final
+                and not bound_method
+            ):
                 required = self._required_positional_count(temp)
                 if required:
                     argument_end = index + 1 + required
@@ -342,6 +361,8 @@ class ResolverMixin(CallMixin):
         traversed = self._resolve_traversal(expression, context)
         if traversed is not _UNRESOLVED:
             return traversed
+        if self._greedy_root_requires_arguments(expression, context):
+            return _UNRESOLVED
         if re.search(r"\s", expression):
             legacy = self._resolve_legacy_expression(expression, context)
             if legacy is not _UNRESOLVED:
