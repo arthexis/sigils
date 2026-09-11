@@ -70,3 +70,21 @@ def test_unresolved_segment_remains_unresolved_without_callable():
     }
 
     assert Sigil("[name.missing]").solve(context) == "[name.missing]"
+
+
+def test_continuation_exception_leaves_expression_unresolved():
+    def explode(value):
+        raise KeyError(value)
+
+    context = {
+        "name": "Alice",
+        "explode": explode,
+    }
+
+    assert Sigil("[name.explode]").solve(context) == "[name.explode]"
+
+
+def test_out_of_range_sequence_index_remains_unresolved():
+    context = {"items": []}
+
+    assert Sigil("[items.99]").solve(context) == "[items.99]"
