@@ -101,7 +101,7 @@ def test_space_alias_does_not_cross_explicit_dot_boundary():
     assert Sigil("[node.server start]").solve(context) == "right"
 
 
-def test_ambiguous_space_alias_stays_unresolved():
+def test_existing_space_grammar_wins_before_alias_ambiguity():
     context = {
         "root": {
             "alpha_beta": {"gamma": "left"},
@@ -109,12 +109,23 @@ def test_ambiguous_space_alias_stays_unresolved():
         }
     }
 
-    template = Sigil("[root.alpha beta gamma]")
-    assert template.solve(context) == "[root.alpha beta gamma]"
+    assert Sigil("[root.alpha beta gamma]").solve(context) == "beta_gamma"
 
 
-def test_literal_marker_disables_space_alias_for_that_pair():
-    context = {"root": {"server_start": "started"}}
+def test_percent_inside_sigil_is_a_regular_key_character():
+    context = {"root": {"%server": "percent"}}
 
-    template = Sigil("[root.%server start]")
-    assert template.solve(context) == "[root.%server start]"
+    assert Sigil("[root.%server]").solve(context) == "percent"
+
+
+def test_double_brackets_are_literal_constants():
+    context = {"start_server": "started"}
+
+    assert Sigil("[[start_server]]").solve(context) == "start_server"
+    assert Sigil("before [[server start]] after").solve(context) == "before server start after"
+
+
+def test_double_bracket_constant_and_sigil_can_share_template():
+    context = {"start_server": "started"}
+
+    assert Sigil("[[start_server]] [start_server]").solve(context) == "start_server started"
