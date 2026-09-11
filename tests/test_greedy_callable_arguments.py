@@ -45,27 +45,27 @@ def test_builtin_signature_can_drive_greedy_arguments():
 
 
 def test_optional_parameters_are_not_greedily_consumed():
-    def make_record(value="default"):
-        return {"value": value}
+    def make_record(value, suffix="default"):
+        return {"label": f"{value}:{suffix}"}
 
     context = {
         "make": make_record,
         "value": "context",
     }
 
-    assert Sigil("[make.value]").solve(context) == "[make.value]"
+    assert Sigil("[make.value.label]").solve(context) == "context:default"
 
 
 def test_varargs_are_not_greedily_consumed():
-    def collect(*values):
-        return values
+    def make_record(value, *extras):
+        return {"count": len(extras), "value": value}
 
     context = {
-        "collect": collect,
-        "first": 1,
+        "make": make_record,
+        "value": "context",
     }
 
-    assert Sigil("[collect.first]").solve(context) == "[collect.first]"
+    assert Sigil("[make.value.count]").solve(context) == "0"
 
 
 def test_missing_required_segment_leaves_expression_unresolved():
