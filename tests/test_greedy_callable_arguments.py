@@ -1,6 +1,6 @@
 """Regression tests for greedy root-callable argument resolution."""
 
-from sigils import Sigil
+from sigils import SafeNamespace, Sigil
 
 
 def test_root_callable_consumes_one_required_argument():
@@ -84,3 +84,23 @@ def test_unresolvable_required_argument_leaves_expression_unresolved():
     }
 
     assert Sigil("[add.left.missing]").solve(context) == "[add.left.missing]"
+
+
+def test_safe_namespace_does_not_greedily_invoke_unapproved_callable():
+    called = False
+
+    def dangerous(value):
+        nonlocal called
+        called = True
+        return value
+
+    context = {
+        "protected": SafeNamespace({"dangerous": dangerous}),
+        "value": "context",
+    }
+
+    assert (
+        Sigil("[protected.dangerous.value]").solve(context)
+        == "[protected.dangerous.value]"
+    )
+    assert called is False
