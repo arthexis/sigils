@@ -1,9 +1,16 @@
 import re
 
+from ..namespace import SafeNamespace
 from ..secret import Secret
+from ..tools import tools
 from .constants import _UNRESOLVED
-from .member import resolve_member
+from .member import MemberResolution, resolve_member
 from .pending import PendingCall
+from .session import SemanticResolutionSession
+
+
+def _no_aliases(_key):
+    return ()
 
 
 class ResolutionPrecedenceMixin:
@@ -16,6 +23,309 @@ class ResolutionPrecedenceMixin:
         if self._space_structure_only:
             return 0
         return super()._required_positional_count(function)
+
+    def _begin_resolution_session(self, context):
+        """Return the active evaluation session and whether this call owns it."""
+        session = getattr(self, "_resolution_session", None)
+        if session is not None:
+            return session, False
+        session = SemanticResolutionSession(context)
+        self._resolution_session = session
+        return session, True
+
+    def _finish_resolution_session(self, session, owns_session):
+        """Persist the completed state for later introspection and clear scope."""
+        if not owns_session:
+            return
+        self._last_resolution_state = session.state
+        self._last_resolution_memo_size = len(session.memo)
+        del self._resolution_session
+
+    def _resolve_expression(self, expression, context):
+        """Scope semantic state and memoization to one expression evaluation."""
+        session, owns_session = self._begin_resolution_session(context)
+        try:
+            return super()._resolve_expression(expression, context)
+        finally:
+            self._finish_resolution_session(session, owns_session)
+
+    def _semantic_member(self, session, owner, key, index, protected_path):
+        """Resolve one production traversal segment with root precedence intact."""
+        raw_owner = owner.reveal() if isinstance(owner, Secret) else owner
+
+        if isinstance(raw_owner, SafeNamespace):
+            return session.resolve_member(
+                owner,
+                key,
+                aliases=self._key_aliases,
+                segment=index,
+                protected_path=protected_path,
+                phase="safe_namespace",
+            )
+
+        if protected_path:
+            return session.resolve_member(
+                owner,
+                key,
+                aliases=_no_aliases,
+                segment=index,
+                protected_path=True,
+                phase="protected",
+            )
+
+        if index == 0:
+            exact = session.resolve_member(
+                owner,
+                key,
+                aliases=_no_aliases,
+                segment=index,
+                protected_path=False,
+                allow_attributes=False,
+                phase="root_exact",
+            )
+            if exact.resolved:
+                return exact
+            if key in tools:
+                value = tools[key]
+                session.record(
+                    "root_tool_lookup",
+                    segment=index,
+                    outcome="success",
+                    detail=key,
+                    value=value,
+                )
+                return MemberResolution(value, False)
+
+        return session.resolve_member(
+            owner,
+            key,
+            aliases=self._key_aliases,
+            segment=index,
+            protected_path=False,
+            phase="structural",
+        )
+
+    def _resolve_traversal(self, expression, context, *, invoke_final=True):
+        """Resolve ordinary traversal through one traced semantic state."""
+        session, owns_session = self._begin_resolution_session(context)
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
+        value = context
+        protected_path = False
+        greedy_path = "." in expression or bool(re.search(r"\s", expression))
+        index = 0
+        try:
+            while index < len(keys):
+                key = keys[index]
+                parent_protected = isinstance(value, Secret)
+                result = self._semantic_member(
+                    session, value, key, index, protected_path
+                )
+                bound_method = result.bound_method
+                temp = result.value
+                if parent_protected and isinstance(temp, Secret):
+                    temp = temp.reveal()
+                protected_path = result.protected
+
+                if (not result.resolved or temp is None) and index > 0 and not protected_path:
+                    session.record(
+                        "continuation_lookup",
+                        segment=index,
+                        outcome="attempted",
+                        detail=key,
+                        value=value,
+                    )
+                    continuation = self._resolve_traversal(
+                        key, context, invoke_final=False
+                    )
+                    if callable(continuation):
+                        temp = self._run_continuation(continuation, value)
+                        if temp is _UNRESOLVED:
+                            session.record(
+                                "continuation_lookup",
+                                segment=index,
+                                outcome="failed",
+                                detail=key,
+                                value=value,
+                            )
+                            return _UNRESOLVED
+                        session.record(
+                            "continuation_lookup",
+                            segment=index,
+                            outcome="selected",
+                            detail=key,
+                            value=temp,
+                            protected=isinstance(temp, Secret),
+                        )
+                        bound_method = False
+
+                if not result.resolved and temp is _UNRESOLVED:
+                    session.record(
+                        "traversal_failed",
+                        segment=index,
+                        outcome="unresolved",
+                        detail=key,
+                        value=value,
+                    )
+                    return _UNRESOLVED
+                if temp is None or temp is _UNRESOLVED:
+                    session.record(
+                        "traversal_failed",
+                        segment=index,
+                        outcome="unresolved",
+                        detail=key,
+                        value=value,
+                    )
+                    return _UNRESOLVED
+
+                final = index == len(keys) - 1
+                if (
+                    greedy_path
+                    and index == 0
+                    and callable(temp)
+                    and not final
+                    and not bound_method
+                ):
+                    required = self._required_positional_count(temp)
+                    session.record(
+                        "callable_arity",
+                        segment=index,
+                        outcome="required" if required else "none",
+                        detail=str(required or 0),
+                        value=temp,
+                        callable_state=temp,
+                        protected=protected_path,
+                    )
+                    if required:
+                        if protected_path and not self._provider_callable(temp):
+                            session.record(
+                                "safe_callable_check",
+                                segment=index,
+                                outcome="rejected",
+                                detail=key,
+                                value=temp,
+                                protected=True,
+                            )
+                            return _UNRESOLVED
+                        available = len(keys) - index - 1
+                        if available < required:
+                            pending = self._make_pending_call(
+                                temp,
+                                keys[index + 1 :],
+                                required - available,
+                                context,
+                            )
+                            session.record(
+                                "pending_call",
+                                segment=index,
+                                outcome="created",
+                                detail=str(required - available),
+                                value=pending,
+                                callable_state=pending,
+                                protected=protected_path,
+                            )
+                            return pending
+                        argument_end = index + 1 + required
+                        temp = self._run_greedy_call(
+                            temp, keys[index + 1 : argument_end], context
+                        )
+                        if temp is _UNRESOLVED:
+                            session.record(
+                                "greedy_call",
+                                segment=index,
+                                outcome="failed",
+                                detail=key,
+                                value=value,
+                            )
+                            return _UNRESOLVED
+                        session.record(
+                            "greedy_call",
+                            segment=index,
+                            outcome="success",
+                            detail=key,
+                            value=temp,
+                            protected=isinstance(temp, Secret),
+                        )
+                        index = argument_end - 1
+                        final = index == len(keys) - 1
+
+                if bound_method:
+                    try:
+                        temp = temp()
+                    except (TypeError, ValueError):
+                        session.record(
+                            "callable_invoked",
+                            segment=index,
+                            outcome="failed",
+                            detail=key,
+                            value=value,
+                        )
+                        return _UNRESOLVED
+                    session.record(
+                        "callable_invoked",
+                        segment=index,
+                        outcome="success",
+                        detail=key,
+                        value=temp,
+                        protected=protected_path,
+                    )
+                elif callable(temp) and final:
+                    if protected_path and not self._provider_callable(temp):
+                        session.record(
+                            "safe_callable_check",
+                            segment=index,
+                            outcome="rejected",
+                            detail=key,
+                            value=temp,
+                            protected=True,
+                        )
+                        return _UNRESOLVED
+                    if invoke_final:
+                        temp = self._run_func(temp, [], value, context)
+                        if temp is _UNRESOLVED:
+                            session.record(
+                                "callable_invoked",
+                                segment=index,
+                                outcome="failed",
+                                detail=key,
+                                value=value,
+                            )
+                            return _UNRESOLVED
+                        if temp is None:
+                            temp = key
+                        session.record(
+                            "callable_invoked",
+                            segment=index,
+                            outcome="success",
+                            detail=key,
+                            value=temp,
+                            protected=protected_path,
+                        )
+
+                if parent_protected and not isinstance(temp, Secret):
+                    temp = Secret(temp)
+                value = temp
+                session.record(
+                    "segment_resolved",
+                    segment=index,
+                    outcome="success",
+                    detail=key,
+                    value=value,
+                    protected=protected_path or isinstance(value, Secret),
+                )
+                index += 1
+
+            result = value if value is not None else _UNRESOLVED
+            session.record(
+                "traversal_complete",
+                segment=max(index - 1, 0),
+                outcome="success" if result is not _UNRESOLVED else "unresolved",
+                detail=expression,
+                value=result,
+                protected=protected_path or isinstance(result, Secret),
+            )
+            return result
+        finally:
+            self._finish_resolution_session(session, owns_session)
 
     def _resolve_explicit_pass(self, expression, context):
         """Resolve explicit passing, consuming further values while pending."""
