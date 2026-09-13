@@ -114,23 +114,34 @@ class SemanticResolutionSession:
             states.append(candidate)
             labels[id(candidate)] = label
 
-        beam = BoundedResolutionBeam(states)
-        kept_ids = {id(state) for state in beam.states}
-        selected = beam.states[0]
+        beam = BoundedResolutionBeam(())
+        kept, dominated, dropped = beam.classify(states)
+        if not kept:
+            return None
+        selected = kept[0]
         selected_label = labels[id(selected)]
         self.state = selected
 
+        dominated_ids = {id(candidate) for candidate in dominated}
+        dropped_ids = {id(candidate) for candidate in dropped}
+        kept_ids = {id(candidate) for candidate in kept}
         for candidate in states:
-            label = labels[id(candidate)]
             if id(candidate) == id(selected):
                 continue
-            outcome = "beam_dropped" if id(candidate) not in kept_ids else "not_selected"
+            if id(candidate) in dominated_ids:
+                outcome = "dominated"
+            elif id(candidate) in dropped_ids:
+                outcome = "beam_dropped"
+            elif id(candidate) in kept_ids:
+                outcome = "not_selected"
+            else:
+                continue
             self.state = self.state.event(
                 ResolutionEvent(
                     "candidate_pruned",
                     segment=segment,
                     outcome=outcome,
-                    detail=label,
+                    detail=labels[id(candidate)],
                 )
             )
 
