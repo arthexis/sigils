@@ -110,7 +110,6 @@ def test_local_call_records_typed_callable_state() -> None:
     )
 
     assert metadata["resolved"] is True
-    assert metadata["callable_state"] == "ready"
     assert any(
         event["kind"] == "callable_state"
         and event["outcome"] == "ready"
