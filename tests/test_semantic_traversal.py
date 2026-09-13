@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+import sigils.sigil.session as session_module
 from sigils import Sigil
+from sigils.sigil.session import SemanticResolutionSession
 
 
 def test_production_traversal_records_real_resolution_events() -> None:
@@ -60,6 +65,27 @@ def test_segment_memo_avoids_repeating_descriptor_lookup_across_retry() -> None:
     )
 
 
+def test_segment_memo_rejects_stale_entry_when_owner_identity_changes(monkeypatch) -> None:
+    """An id collision must not reuse another owner's cached resolution."""
+
+    class Owner:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    monkeypatch.setattr(session_module, "id", lambda _owner: 1, raising=False)
+    session = SemanticResolutionSession({})
+    first = Owner("first")
+    second = Owner("second")
+
+    first_result = session.resolve_member(first, "value", aliases=lambda _key: (), segment=0)
+    second_result = session.resolve_member(second, "value", aliases=lambda _key: (), segment=0)
+
+    assert first_result.value == "first"
+    assert second_result.value == "second"
+    memo_events = [event for event in session.state.trace if event.kind == "segment_memo"]
+    assert [event.outcome for event in memo_events] == ["miss", "miss"]
+
+
 def test_continuation_behavior_is_preserved_under_semantic_traversal() -> None:
     sigil = Sigil("[name.slugify]")
     context = {
@@ -89,3 +115,30 @@ def test_each_solve_gets_a_fresh_semantic_session() -> None:
     assert first_memo_size > 0
     assert sigil._last_resolution_memo_size > 0
     assert second_state.trace[0].outcome == "miss"
+
+
+def test_concurrent_solves_on_one_sigil_use_distinct_semantic_sessions() -> None:
+    """Concurrent evaluations must not share or delete each other's session."""
+    sigil = Sigil("[service.value]")
+    barrier = threading.Barrier(2)
+    session_ids: dict[str, int] = {}
+
+    class Service:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        @property
+        def value(self) -> str:
+            session_ids[self.name] = id(sigil._resolution_session)
+            barrier.wait(timeout=5)
+            return self.name
+
+    def solve(name: str) -> str:
+        return sigil.solve({"service": Service(name)})
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(solve, "first")
+        second = executor.submit(solve, "second")
+        assert {first.result(timeout=10), second.result(timeout=10)} == {"first", "second"}
+
+    assert session_ids["first"] != session_ids["second"]
