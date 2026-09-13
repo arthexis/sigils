@@ -113,7 +113,8 @@ def test_each_solve_gets_a_fresh_semantic_session() -> None:
     assert second_state.value == "second"
     assert first_memo_size > 0
     assert sigil._last_resolution_memo_size > 0
-    assert second_state.trace[0].outcome == "miss"
+    memo_events = [event for event in second_state.trace if event.kind == "segment_memo"]
+    assert memo_events[0].outcome == "miss"
 
 
 def test_same_sigil_can_solve_concurrently_with_isolated_sessions() -> None:
