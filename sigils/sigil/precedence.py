@@ -1,8 +1,8 @@
 import re
 
-from ..namespace import SafeNamespace
 from ..secret import Secret
 from .constants import _UNRESOLVED
+from .member import resolve_member
 from .pending import PendingCall
 
 
@@ -55,61 +55,16 @@ class ResolutionPrecedenceMixin:
 
         protected_path = False
         for key in keys:
-            parent_protected = isinstance(value, Secret)
-            lookup_value = value.reveal() if parent_protected else value
-
-            if isinstance(lookup_value, SafeNamespace):
-                member = _UNRESOLVED
-                for candidate in (key, *self._key_aliases(key)):
-                    try:
-                        member = lookup_value.resolve(candidate)
-                        break
-                    except KeyError:
-                        continue
-                if member is _UNRESOLVED:
-                    return _UNRESOLVED, protected_path
-                protected_path = True
-            elif protected_path:
-                if isinstance(lookup_value, dict):
-                    member = _UNRESOLVED
-                    for candidate in (key, *self._key_aliases(key)):
-                        if candidate in lookup_value:
-                            member = lookup_value[candidate]
-                            break
-                    if member is _UNRESOLVED:
-                        return _UNRESOLVED, protected_path
-                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                    try:
-                        member = lookup_value[int(key)]
-                    except IndexError:
-                        return _UNRESOLVED, protected_path
-                else:
-                    return _UNRESOLVED, protected_path
-            elif isinstance(lookup_value, dict):
-                member = _UNRESOLVED
-                for candidate in (key, *self._key_aliases(key)):
-                    if candidate in lookup_value:
-                        member = lookup_value[candidate]
-                        break
-                if member is _UNRESOLVED:
-                    return _UNRESOLVED, protected_path
-            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
-                try:
-                    member = lookup_value[int(key)]
-                except IndexError:
-                    return _UNRESOLVED, protected_path
-            else:
-                member = _UNRESOLVED
-                for candidate in (key, *self._key_aliases(key)):
-                    if hasattr(lookup_value, candidate):
-                        member = getattr(lookup_value, candidate)
-                        break
-                if member is _UNRESOLVED:
-                    return _UNRESOLVED, protected_path
-
-            if parent_protected and not isinstance(member, Secret):
-                member = Secret(member)
-            value = member
+            result = resolve_member(
+                value,
+                key,
+                aliases=self._key_aliases,
+                protected_path=protected_path,
+            )
+            if not result.resolved:
+                return _UNRESOLVED, protected_path
+            value = result.value
+            protected_path = result.protected
 
         return value, protected_path
 
