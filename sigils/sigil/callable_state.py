@@ -131,6 +131,84 @@ class CallableStateMixin:
             return _UNRESOLVED
         return super()._run_continuation(state.value, value)
 
+    def _record_callable_transition(
+        self,
+        previous: CallableState,
+        current: CallableState,
+        *,
+        detail: str,
+    ) -> None:
+        session = getattr(self, "_resolution_session", None)
+        if session is None:
+            return
+        remaining = current.missing if current.pending else 0
+        session.record(
+            "callable_transition",
+            segment=0,
+            outcome=current.kind.value,
+            detail=f"{detail}:{previous.missing}->{remaining}",
+            value=current.value,
+            callable_state=current if current.callable else None,
+            protected=current.protected,
+        )
+
+    def _consume_pending_state(
+        self,
+        state: CallableState,
+        value,
+        *,
+        detail: str = "pending",
+    ) -> tuple[object, CallableState]:
+        """Consume one leading value and return both value and updated callable state."""
+        if not state.pending:
+            unresolved_state = self._callable_state(_UNRESOLVED)
+            return _UNRESOLVED, unresolved_state
+
+        protected = isinstance(value, Secret)
+        argument = value.reveal() if protected else value
+        try:
+            result = state.value.consume(argument, protected=protected)
+        except Exception:
+            unresolved_state = self._callable_state(_UNRESOLVED)
+            self._record_callable_transition(
+                state,
+                unresolved_state,
+                detail=f"{detail}:failed",
+            )
+            return _UNRESOLVED, unresolved_state
+
+        result_state = self._callable_state(result, local=state.local)
+        if result_state.pending:
+            self._record_callable_transition(state, result_state, detail=detail)
+            return result, result_state
+
+        result_value, protected_result = result
+        if result_value is None:
+            unresolved_state = self._callable_state(_UNRESOLVED)
+            self._record_callable_transition(
+                state,
+                unresolved_state,
+                detail=f"{detail}:empty",
+            )
+            return _UNRESOLVED, unresolved_state
+        if protected_result and not isinstance(result_value, Secret):
+            result_value = Secret(result_value)
+        next_state = self._callable_state(
+            result_value,
+            protected=protected_result,
+            local=state.local,
+        )
+        self._record_callable_transition(state, next_state, detail=detail)
+        return result_value, next_state
+
+    def _consume_pending(self, pending, value):
+        """Preserve the resolver API while returning through a typed transition."""
+        result, _state = self._consume_pending_state(
+            self._callable_state(pending),
+            value,
+        )
+        return result
+
     def _resolve_explicit_pass(self, expression, context):
         """Resolve explicit passing using CallableState for every callable branch."""
         parts = self._split_explicit_pass(expression)
@@ -140,15 +218,19 @@ class CallableStateMixin:
         value = self._resolve_single_expression(parts[0], context)
         if value is _UNRESOLVED:
             return _UNRESOLVED
+        value_state = self._callable_state(value)
 
         for target_expression in parts[1:]:
-            value_state = self._callable_state(value)
             if value_state.pending:
                 argument = self._resolve_single_expression(target_expression, context)
                 argument_state = self._callable_state(argument)
                 if argument is _UNRESOLVED or argument_state.pending:
                     return _UNRESOLVED
-                value = self._consume_pending(value_state.value, argument)
+                value, value_state = self._consume_pending_state(
+                    value_state,
+                    argument,
+                    detail=target_expression,
+                )
             else:
                 target = self._resolve_traversal(
                     target_expression,
@@ -160,9 +242,14 @@ class CallableStateMixin:
 
                 target_state = self._callable_state(target)
                 if target_state.pending:
-                    value = self._consume_pending(target_state.value, value)
+                    value, value_state = self._consume_pending_state(
+                        target_state,
+                        value,
+                        detail=target_expression,
+                    )
                 elif target_state.ready:
                     value = self._run_continuation(target_state.value, value)
+                    value_state = self._callable_state(value)
                 else:
                     return _UNRESOLVED
 
