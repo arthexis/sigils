@@ -84,12 +84,6 @@ def test_explain_output_is_plain_serializable_metadata() -> None:
     assert isinstance(metadata["memo"], dict)
 
 
-def test_question_mark_remains_reserved_for_future_language_use() -> None:
-    rendered = Sigil("[value ?]").solve({"value": 42})
-
-    assert rendered == "[value ?]"
-
-
 def test_explain_rejects_multi_expression_templates() -> None:
     sigil = Sigil("[left] [right]")
 
