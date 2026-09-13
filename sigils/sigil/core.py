@@ -3,6 +3,7 @@ import threading
 
 from .budgeting import ResolutionBudgetMixin
 from .introspection import IntrospectionMixin
+from .interpretations import BoundedInterpretationMixin
 from .precedence import ResolutionPrecedenceMixin
 from .render import RenderMixin
 from .resolver import ResolverMixin
@@ -12,6 +13,7 @@ class Sigil(
     RenderMixin,
     IntrospectionMixin,
     ResolutionBudgetMixin,
+    BoundedInterpretationMixin,
     ResolutionPrecedenceMixin,
     ResolverMixin,
 ):
