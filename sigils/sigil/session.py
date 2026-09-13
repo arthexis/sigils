@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Iterable
 
 from .member import MemberResolution, resolve_member
-from .semantic import ResolutionEvent, ResolutionState, SegmentMemo
+from .semantic import BoundedResolutionBeam, ResolutionEvent, ResolutionState, SegmentMemo
 
 _MISSING = object()
 _KEEP = object()
@@ -12,7 +12,7 @@ _KEEP = object()
 
 @dataclass(slots=True)
 class SemanticResolutionSession:
-    """Carry one production resolution state and memo through an evaluation."""
+    """Carry production resolution state, memo, and bounded candidates."""
 
     root: object
     memo: SegmentMemo = field(default_factory=SegmentMemo)
@@ -45,6 +45,72 @@ class SemanticResolutionSession:
         )
         return self.state
 
+    def select_candidate(
+        self,
+        candidates: Iterable[tuple[str, object, int, object | None, bool]],
+        *,
+        segment: int,
+    ) -> tuple[str, ResolutionState] | None:
+        """Rank semantic candidates, keep at most four, and select the strongest."""
+        candidates = tuple(candidates)
+        if not candidates:
+            return None
+
+        base = self.state
+        for label, _value, _score, _callable_state, _protected in candidates:
+            base = base.event(
+                ResolutionEvent(
+                    "candidate_created",
+                    segment=segment,
+                    outcome="viable",
+                    detail=label,
+                )
+            )
+
+        states = []
+        labels: dict[int, str] = {}
+        for label, value, score, callable_state, protected in candidates:
+            candidate = replace(
+                base,
+                position=segment,
+                value=value,
+                callable_state=callable_state,
+                protected=protected,
+                score=base.score + score,
+            )
+            states.append(candidate)
+            labels[id(candidate)] = label
+
+        beam = BoundedResolutionBeam(states)
+        kept_ids = {id(state) for state in beam.states}
+        selected = beam.states[0]
+        selected_label = labels[id(selected)]
+        self.state = selected
+
+        for candidate in states:
+            label = labels[id(candidate)]
+            if id(candidate) == id(selected):
+                continue
+            outcome = "beam_dropped" if id(candidate) not in kept_ids else "not_selected"
+            self.state = self.state.event(
+                ResolutionEvent(
+                    "candidate_pruned",
+                    segment=segment,
+                    outcome=outcome,
+                    detail=label,
+                )
+            )
+
+        self.state = self.state.event(
+            ResolutionEvent(
+                "candidate_selected",
+                segment=segment,
+                outcome="selected",
+                detail=selected_label,
+            )
+        )
+        return selected_label, self.state
+
     def resolve_member(
         self,
         owner: object,
@@ -76,7 +142,7 @@ class SemanticResolutionSession:
                 allow_attributes=allow_attributes,
             )
             self.memo.set(memo_key, (owner, result))
-            memo_outcome = "miss"
+            memo_outcome = "miss" if entry is _MISSING else "collision"
         else:
             result = entry[1]
 

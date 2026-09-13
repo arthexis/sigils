@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import threading
-from concurrent.futures import ThreadPoolExecutor
 
-import sigils.sigil.session as session_module
 from sigils import Sigil
+from sigils.sigil import session as session_module
 from sigils.sigil.session import SemanticResolutionSession
 
 
@@ -83,7 +82,7 @@ def test_segment_memo_rejects_stale_entry_when_owner_identity_changes(monkeypatc
     assert first_result.value == "first"
     assert second_result.value == "second"
     memo_events = [event for event in session.state.trace if event.kind == "segment_memo"]
-    assert [event.outcome for event in memo_events] == ["miss", "miss"]
+    assert [event.outcome for event in memo_events] == ["miss", "collision"]
 
 
 def test_continuation_behavior_is_preserved_under_semantic_traversal() -> None:
@@ -117,28 +116,30 @@ def test_each_solve_gets_a_fresh_semantic_session() -> None:
     assert second_state.trace[0].outcome == "miss"
 
 
-def test_concurrent_solves_on_one_sigil_use_distinct_semantic_sessions() -> None:
-    """Concurrent evaluations must not share or delete each other's session."""
-    sigil = Sigil("[service.value]")
+def test_same_sigil_can_solve_concurrently_with_isolated_sessions() -> None:
+    sigil = Sigil("[value]")
     barrier = threading.Barrier(2)
-    session_ids: dict[str, int] = {}
+    session_ids = []
+    results = []
 
-    class Service:
-        def __init__(self, name: str) -> None:
-            self.name = name
+    original_begin = sigil._begin_resolution_session
 
-        @property
-        def value(self) -> str:
-            session_ids[self.name] = id(sigil._resolution_session)
-            barrier.wait(timeout=5)
-            return self.name
+    def synchronized_begin(context):
+        session, owns_session = original_begin(context)
+        session_ids.append(id(session))
+        barrier.wait()
+        return session, owns_session
 
-    def solve(name: str) -> str:
-        return sigil.solve({"service": Service(name)})
+    sigil._begin_resolution_session = synchronized_begin
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        first = executor.submit(solve, "first")
-        second = executor.submit(solve, "second")
-        assert {first.result(timeout=10), second.result(timeout=10)} == {"first", "second"}
+    def solve(value):
+        results.append(sigil.solve({"value": value}))
 
-    assert session_ids["first"] != session_ids["second"]
+    threads = [threading.Thread(target=solve, args=(value,)) for value in ("a", "b")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(results) == ["a", "b"]
+    assert len(set(session_ids)) == 2
