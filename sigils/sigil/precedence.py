@@ -5,6 +5,7 @@ from ..secret import Secret
 from ..tools import tools
 from .constants import _UNRESOLVED
 from .member import MemberResolution, resolve_member
+from .modes import CallableKind, CallableState, ResolutionMode
 from .pending import PendingCall
 from .session import SemanticResolutionSession
 
@@ -15,14 +16,6 @@ def _no_aliases(_key):
 
 class ResolutionPrecedenceMixin:
     """Language-level precedence rules layered over the base resolver."""
-
-    _space_structure_only = False
-
-    def _required_positional_count(self, function):
-        """Suppress greedy calls during the first whitespace traversal pass."""
-        if self._space_structure_only:
-            return 0
-        return super()._required_positional_count(function)
 
     def _begin_resolution_session(self, context):
         """Return the active evaluation session and whether this call owns it."""
@@ -49,7 +42,23 @@ class ResolutionPrecedenceMixin:
         finally:
             self._finish_resolution_session(session, owns_session)
 
-    def _semantic_member(self, session, owner, key, index, protected_path):
+    @staticmethod
+    def _coerce_resolution_mode(mode, invoke_final):
+        """Translate legacy invoke_final callers into the explicit mode model."""
+        if invoke_final is None:
+            return mode
+        return ResolutionMode.CALL if invoke_final else ResolutionMode.LOOKUP
+
+    def _semantic_member(
+        self,
+        session,
+        owner,
+        key,
+        index,
+        protected_path,
+        *,
+        mode=ResolutionMode.CALL,
+    ):
         """Resolve one production traversal segment with root precedence intact."""
         raw_owner = owner.reveal() if isinstance(owner, Secret) else owner
 
@@ -73,7 +82,7 @@ class ResolutionPrecedenceMixin:
                 phase="protected",
             )
 
-        if index == 0:
+        if index == 0 and mode.root_lookup:
             exact = session.resolve_member(
                 owner,
                 key,
@@ -105,8 +114,103 @@ class ResolutionPrecedenceMixin:
             phase="structural",
         )
 
-    def _resolve_traversal(self, expression, context, *, invoke_final=True):
-        """Resolve ordinary traversal through one traced semantic state."""
+    def _safe_continuation_candidate(self, session, context, key, index):
+        """Probe a root continuation without invoking attributes or callables."""
+        raw_context = context.reveal() if isinstance(context, Secret) else context
+        if isinstance(raw_context, SafeNamespace):
+            result = session.resolve_member(
+                context,
+                key,
+                aliases=self._key_aliases,
+                segment=index,
+                protected_path=False,
+                phase="continuation_probe",
+            )
+            candidate = result.value if result.resolved else _UNRESOLVED
+        elif isinstance(raw_context, dict):
+            result = session.resolve_member(
+                context,
+                key,
+                aliases=self._key_aliases,
+                segment=index,
+                protected_path=False,
+                allow_attributes=False,
+                phase="continuation_probe",
+            )
+            candidate = result.value if result.resolved else _UNRESOLVED
+        elif key in tools:
+            candidate = tools[key]
+            session.record(
+                "root_tool_lookup",
+                segment=index,
+                outcome="probe",
+                detail=key,
+                value=candidate,
+            )
+        else:
+            return _UNRESOLVED
+
+        if isinstance(candidate, Secret):
+            candidate = candidate.reveal()
+        return candidate if callable(candidate) else _UNRESOLVED
+
+    def _choose_structural_route(
+        self,
+        session,
+        result,
+        continuation,
+        value,
+        *,
+        key,
+        index,
+        protected_path,
+    ):
+        """Use the bounded beam to rank member and continuation interpretations."""
+        candidates = []
+        if result.resolved and result.value is not None:
+            member_score = 30 if result.alias is None else 25
+            callable_state = CallableState.classify(
+                result.value,
+                bound=result.bound_method,
+                protected=result.protected,
+            )
+            candidates.append(
+                (
+                    "member",
+                    result.value,
+                    member_score,
+                    callable_state if callable_state.callable else None,
+                    result.protected,
+                )
+            )
+        if callable(continuation):
+            candidates.append(
+                (
+                    "continuation",
+                    value,
+                    20,
+                    CallableState.classify(continuation, protected=protected_path),
+                    protected_path,
+                )
+            )
+        if not candidates:
+            return None
+        return session.select_candidate(candidates, segment=index)
+
+    def _resolve_traversal(
+        self,
+        expression,
+        context,
+        *,
+        mode=ResolutionMode.CALL,
+        invoke_final=None,
+    ):
+        """Resolve traversal using an explicit semantic mode.
+
+        ``invoke_final`` remains as a compatibility shim for base resolver helpers;
+        production precedence code uses ``ResolutionMode`` directly.
+        """
+        mode = self._coerce_resolution_mode(mode, invoke_final)
         session, owns_session = self._begin_resolution_session(context)
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -114,11 +218,23 @@ class ResolutionPrecedenceMixin:
         greedy_path = "." in expression or bool(re.search(r"\s", expression))
         index = 0
         try:
+            session.record(
+                "resolution_mode",
+                segment=0,
+                outcome="selected",
+                detail=mode.name.lower(),
+                value=value,
+            )
             while index < len(keys):
                 key = keys[index]
                 parent_protected = isinstance(value, Secret)
                 result = self._semantic_member(
-                    session, value, key, index, protected_path
+                    session,
+                    value,
+                    key,
+                    index,
+                    protected_path,
+                    mode=mode,
                 )
                 bound_method = result.bound_method
                 temp = result.value
@@ -126,7 +242,50 @@ class ResolutionPrecedenceMixin:
                     temp = temp.reveal()
                 protected_path = result.protected
 
-                if (not result.resolved or temp is None) and index > 0 and not protected_path:
+                continuation = _UNRESOLVED
+                selected_route = None
+                if mode.continuation and index > 0 and not protected_path:
+                    continuation = self._safe_continuation_candidate(
+                        session, context, key, index
+                    )
+                    selection = self._choose_structural_route(
+                        session,
+                        result,
+                        continuation,
+                        value,
+                        key=key,
+                        index=index,
+                        protected_path=protected_path,
+                    )
+                    if selection is not None:
+                        selected_route = selection[0]
+
+                if selected_route == "continuation":
+                    session.record(
+                        "continuation_lookup",
+                        segment=index,
+                        outcome="selected",
+                        detail=key,
+                        value=value,
+                    )
+                    temp = self._run_continuation(continuation, value)
+                    if temp is _UNRESOLVED:
+                        session.record(
+                            "continuation_lookup",
+                            segment=index,
+                            outcome="failed",
+                            detail=key,
+                            value=value,
+                        )
+                        return _UNRESOLVED
+                    bound_method = False
+                elif (
+                    mode.continuation
+                    and selected_route is None
+                    and (not result.resolved or temp is None)
+                    and index > 0
+                    and not protected_path
+                ):
                     session.record(
                         "continuation_lookup",
                         segment=index,
@@ -135,7 +294,9 @@ class ResolutionPrecedenceMixin:
                         value=value,
                     )
                     continuation = self._resolve_traversal(
-                        key, context, invoke_final=False
+                        key,
+                        context,
+                        mode=ResolutionMode.LOOKUP,
                     )
                     if callable(continuation):
                         temp = self._run_continuation(continuation, value)
@@ -178,12 +339,27 @@ class ResolutionPrecedenceMixin:
                     return _UNRESOLVED
 
                 final = index == len(keys) - 1
+                callable_state = CallableState.classify(
+                    temp,
+                    bound=bound_method,
+                    protected=protected_path,
+                )
+                session.record(
+                    "callable_state",
+                    segment=index,
+                    outcome=callable_state.kind.value,
+                    detail=key,
+                    value=temp,
+                    callable_state=callable_state if callable_state.callable else None,
+                    protected=protected_path,
+                )
+
                 if (
-                    greedy_path
+                    mode.greedy_calls
+                    and greedy_path
                     and index == 0
-                    and callable(temp)
+                    and callable_state.kind is CallableKind.READY
                     and not final
-                    and not bound_method
                 ):
                     required = self._required_positional_count(temp)
                     session.record(
@@ -192,7 +368,7 @@ class ResolutionPrecedenceMixin:
                         outcome="required" if required else "none",
                         detail=str(required or 0),
                         value=temp,
-                        callable_state=temp,
+                        callable_state=callable_state,
                         protected=protected_path,
                     )
                     if required:
@@ -214,13 +390,17 @@ class ResolutionPrecedenceMixin:
                                 required - available,
                                 context,
                             )
+                            pending_state = CallableState.classify(
+                                pending,
+                                protected=protected_path,
+                            )
                             session.record(
                                 "pending_call",
                                 segment=index,
                                 outcome="created",
                                 detail=str(required - available),
                                 value=pending,
-                                callable_state=pending,
+                                callable_state=pending_state,
                                 protected=protected_path,
                             )
                             return pending
@@ -247,8 +427,12 @@ class ResolutionPrecedenceMixin:
                         )
                         index = argument_end - 1
                         final = index == len(keys) - 1
+                        callable_state = CallableState.classify(
+                            temp,
+                            protected=protected_path,
+                        )
 
-                if bound_method:
+                if callable_state.kind is CallableKind.BOUND:
                     try:
                         temp = temp()
                     except (TypeError, ValueError):
@@ -268,7 +452,7 @@ class ResolutionPrecedenceMixin:
                         value=temp,
                         protected=protected_path,
                     )
-                elif callable(temp) and final:
+                elif callable_state.kind is CallableKind.READY and final:
                     if protected_path and not self._provider_callable(temp):
                         session.record(
                             "safe_callable_check",
@@ -279,7 +463,7 @@ class ResolutionPrecedenceMixin:
                             protected=True,
                         )
                         return _UNRESOLVED
-                    if invoke_final:
+                    if mode.invoke_final:
                         temp = self._run_func(temp, [], value, context)
                         if temp is _UNRESOLVED:
                             session.record(
@@ -314,16 +498,16 @@ class ResolutionPrecedenceMixin:
                 )
                 index += 1
 
-            result = value if value is not None else _UNRESOLVED
+            resolved = value if value is not None else _UNRESOLVED
             session.record(
                 "traversal_complete",
                 segment=max(index - 1, 0),
-                outcome="success" if result is not _UNRESOLVED else "unresolved",
+                outcome="success" if resolved is not _UNRESOLVED else "unresolved",
                 detail=expression,
-                value=result,
-                protected=protected_path or isinstance(result, Secret),
+                value=resolved,
+                protected=protected_path or isinstance(resolved, Secret),
             )
-            return result
+            return resolved
         finally:
             self._finish_resolution_session(session, owns_session)
 
@@ -343,13 +527,16 @@ class ResolutionPrecedenceMixin:
                 value = self._consume_pending(value, argument)
             else:
                 target = self._resolve_traversal(
-                    target_expression, context, invoke_final=False
+                    target_expression,
+                    context,
+                    mode=ResolutionMode.LOOKUP,
                 )
                 if target is _UNRESOLVED:
                     return _UNRESOLVED
-                if isinstance(target, PendingCall):
+                target_state = CallableState.classify(target)
+                if target_state.kind is CallableKind.PENDING:
                     value = self._consume_pending(target, value)
-                elif callable(target):
+                elif target_state.kind is CallableKind.READY:
                     value = self._run_continuation(target, value)
                 else:
                     return _UNRESOLVED
@@ -384,7 +571,11 @@ class ResolutionPrecedenceMixin:
         if not keys:
             return _UNRESOLVED
 
-        owner = self._resolve_traversal(keys[0], context, invoke_final=False)
+        owner = self._resolve_traversal(
+            keys[0],
+            context,
+            mode=ResolutionMode.LOOKUP,
+        )
         if owner is _UNRESOLVED or isinstance(owner, PendingCall):
             return _UNRESOLVED
         if len(keys) == 1:
@@ -417,7 +608,8 @@ class ResolutionPrecedenceMixin:
         if isinstance(function, Secret):
             protected_path = True
             function = function.reveal()
-        if function is _UNRESOLVED or not callable(function):
+        callable_state = CallableState.classify(function, protected=protected_path)
+        if function is _UNRESOLVED or callable_state.kind is not CallableKind.READY:
             return _UNRESOLVED
         if protected_path and not self._provider_callable(function):
             return _UNRESOLVED
@@ -443,15 +635,19 @@ class ResolutionPrecedenceMixin:
         if not re.search(r"\s", expression):
             return super()._resolve_single_expression(expression, context)
 
-        self._space_structure_only = True
-        try:
-            traversed = self._resolve_traversal(expression, context)
-        finally:
-            self._space_structure_only = False
+        traversed = self._resolve_traversal(
+            expression,
+            context,
+            mode=ResolutionMode.TRAVERSE,
+        )
         if traversed is not _UNRESOLVED and not isinstance(traversed, PendingCall):
             return traversed
 
-        traversed = self._resolve_traversal(expression, context)
+        traversed = self._resolve_traversal(
+            expression,
+            context,
+            mode=ResolutionMode.CALL,
+        )
         if traversed is not _UNRESOLVED and not isinstance(traversed, PendingCall):
             return traversed
 
