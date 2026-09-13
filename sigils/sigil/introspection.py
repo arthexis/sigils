@@ -33,7 +33,15 @@ def project_resolution(state, value, *, expression):
     trace = tuple(state.trace)
     protected = state.protected or isinstance(value, Secret)
     pending = isinstance(value, PendingCall)
-    complete = value is not _UNRESOLVED and not pending
+    budget_event = next(
+        (
+            event
+            for event in reversed(trace)
+            if event.kind == "complexity_budget" and event.outcome == "exhausted"
+        ),
+        None,
+    )
+    complete = value is not _UNRESOLVED and not pending and budget_event is None
 
     selected_interpretation = None
     resolution_mode = None
@@ -56,7 +64,9 @@ def project_resolution(state, value, *, expression):
                 pending_arguments = 0
 
     if not complete:
-        if pending:
+        if budget_event is not None:
+            failure_reason = f"{budget_event.detail}_budget_exceeded"
+        elif pending:
             failure_reason = "insufficient_arguments"
         else:
             for event in reversed(trace):
@@ -92,6 +102,10 @@ def project_resolution(state, value, *, expression):
         "pending_arguments": pending_arguments,
         "failure_reason": failure_reason,
         "score": state.score,
+        "budget": {
+            "exhausted": budget_event is not None,
+            "reason": budget_event.detail if budget_event is not None else None,
+        },
         "memo": {
             "hits": sum(event.outcome == "hit" for event in memo_events),
             "misses": sum(event.outcome == "miss" for event in memo_events),
