@@ -65,9 +65,9 @@ class SemanticResolutionSession:
             protected_path,
             allow_attributes,
         )
-        result = self.memo.get(memo_key, _MISSING)
+        entry = self.memo.get(memo_key, _MISSING)
         memo_outcome = "hit"
-        if result is _MISSING:
+        if entry is _MISSING or entry[0] is not owner:
             result = resolve_member(
                 owner,
                 key,
@@ -75,8 +75,10 @@ class SemanticResolutionSession:
                 protected_path=protected_path,
                 allow_attributes=allow_attributes,
             )
-            self.memo.set(memo_key, result)
+            self.memo.set(memo_key, (owner, result))
             memo_outcome = "miss"
+        else:
+            result = entry[1]
 
         self.record(
             "segment_memo",
