@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 from typing import Iterable
 
 MAX_STATES = 4
+MAX_INTERPRETATION_EXPANSIONS = 64
+MAX_SEMANTIC_STEPS = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +43,49 @@ class ResolutionState:
             self.protected,
             self.bindings_key,
         )
+
+
+@dataclass(slots=True)
+class ResolutionBudget:
+    """Evaluation-scoped hard limits for semantic resolution work."""
+
+    max_expansions: int = MAX_INTERPRETATION_EXPANSIONS
+    max_steps: int = MAX_SEMANTIC_STEPS
+    expansions: int = 0
+    steps: int = 0
+    exhausted_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_expansions < 1:
+            raise ValueError("interpretation expansion budget must be positive")
+        if self.max_steps < 1:
+            raise ValueError("semantic step budget must be positive")
+
+    @property
+    def exhausted(self) -> bool:
+        return self.exhausted_reason is not None
+
+    def consume_expansions(self, count: int) -> bool:
+        """Consume candidate-expansion capacity without exceeding the hard limit."""
+        if self.exhausted:
+            return False
+        if count < 0:
+            raise ValueError("candidate expansion count cannot be negative")
+        if self.expansions + count > self.max_expansions:
+            self.exhausted_reason = "interpretation_expansions"
+            return False
+        self.expansions += count
+        return True
+
+    def consume_step(self) -> bool:
+        """Consume one semantic decision/event slot."""
+        if self.exhausted:
+            return False
+        if self.steps + 1 > self.max_steps:
+            self.exhausted_reason = "semantic_steps"
+            return False
+        self.steps += 1
+        return True
 
 
 class BoundedResolutionBeam:
