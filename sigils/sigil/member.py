@@ -60,15 +60,17 @@ def resolve_member(
     elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
         try:
             value = lookup_value[int(key)]
-        except IndexError:
+        except (IndexError, ValueError):
             value = _UNRESOLVED
     elif allow_attributes and not protected_path and lookup_value is not None:
         for candidate in candidates:
-            if hasattr(lookup_value, candidate):
+            try:
                 value = getattr(lookup_value, candidate)
-                selected_alias = None if candidate == key else candidate
-                bound_method = callable(value)
-                break
+            except AttributeError:
+                continue
+            selected_alias = None if candidate == key else candidate
+            bound_method = callable(value)
+            break
 
     if value is _UNRESOLVED:
         return MemberResolution(_UNRESOLVED, protected_path)
