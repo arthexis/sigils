@@ -3,8 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Callable, Iterable
 
+from .constants import _UNRESOLVED
 from .member import MemberResolution, resolve_member
-from .semantic import BoundedResolutionBeam, ResolutionEvent, ResolutionState, SegmentMemo
+from .semantic import (
+    BoundedResolutionBeam,
+    ResolutionBudget,
+    ResolutionEvent,
+    ResolutionState,
+    SegmentMemo,
+)
 
 _MISSING = object()
 _KEEP = object()
@@ -16,10 +23,30 @@ class SemanticResolutionSession:
 
     root: object
     memo: SegmentMemo = field(default_factory=SegmentMemo)
+    budget: ResolutionBudget = field(default_factory=ResolutionBudget)
     state: ResolutionState = field(init=False)
+    _budget_event_recorded: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.state = ResolutionState(0, self.root)
+
+    @property
+    def exhausted(self) -> bool:
+        return self.budget.exhausted
+
+    def _record_budget_exhaustion(self, *, segment: int | None = None) -> None:
+        """Emit exactly one structured exhaustion event outside the step budget."""
+        if self._budget_event_recorded or not self.budget.exhausted:
+            return
+        self.state = self.state.event(
+            ResolutionEvent(
+                "complexity_budget",
+                segment=segment,
+                outcome="exhausted",
+                detail=self.budget.exhausted_reason,
+            )
+        )
+        self._budget_event_recorded = True
 
     def record(
         self,
@@ -33,6 +60,9 @@ class SemanticResolutionSession:
         callable_state: object | None = None,
     ) -> ResolutionState:
         """Advance the current state while retaining the full production trace."""
+        if not self.budget.consume_step():
+            self._record_budget_exhaustion(segment=segment)
+            return self.state
         event = ResolutionEvent(kind, segment=segment, outcome=outcome, detail=detail)
         self.state = ResolutionState(
             self.state.position if segment is None else segment,
@@ -54,6 +84,9 @@ class SemanticResolutionSession:
         """Rank semantic candidates, keep at most four, and select the strongest."""
         candidates = tuple(candidates)
         if not candidates:
+            return None
+        if not self.budget.consume_expansions(len(candidates)):
+            self._record_budget_exhaustion(segment=segment)
             return None
 
         base = self.state
@@ -123,6 +156,10 @@ class SemanticResolutionSession:
         phase: str = "structural",
     ) -> MemberResolution:
         """Resolve and memoize one structural segment within this evaluation."""
+        if self.exhausted:
+            self._record_budget_exhaustion(segment=segment)
+            return MemberResolution(_UNRESOLVED, protected_path)
+
         memo_key = (
             "member",
             phase,
@@ -152,6 +189,9 @@ class SemanticResolutionSession:
             outcome=memo_outcome,
             detail=phase,
         )
+        if self.exhausted:
+            return MemberResolution(_UNRESOLVED, protected_path)
+
         detail = result.alias or key
         self.record(
             "member_lookup",
