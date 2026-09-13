@@ -70,8 +70,14 @@ class ResolutionPrecedenceMixin:
                     return _UNRESOLVED, protected_path
                 protected_path = True
             elif protected_path:
-                if isinstance(lookup_value, dict) and key in lookup_value:
-                    member = lookup_value[key]
+                if isinstance(lookup_value, dict):
+                    member = _UNRESOLVED
+                    for candidate in (key, *self._key_aliases(key)):
+                        if candidate in lookup_value:
+                            member = lookup_value[candidate]
+                            break
+                    if member is _UNRESOLVED:
+                        return _UNRESOLVED, protected_path
                 elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
                     try:
                         member = lookup_value[int(key)]
@@ -107,6 +113,21 @@ class ResolutionPrecedenceMixin:
 
         return value, protected_path
 
+    def _resolve_local_owner(self, expression, context):
+        """Resolve a local-call owner without continuation or implicit invocation."""
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
+        if not keys:
+            return _UNRESOLVED
+
+        owner = self._resolve_traversal(keys[0], context, invoke_final=False)
+        if owner is _UNRESOLVED or isinstance(owner, PendingCall):
+            return _UNRESOLVED
+        if len(keys) == 1:
+            return owner
+
+        owner, _ = self._resolve_local_member(owner, ".".join(keys[1:]))
+        return owner
+
     def _resolve_local_call(self, expression, context):
         """Invoke a callable extracted strictly from the value left of ``::``."""
         if expression.count("::") != 1:
@@ -123,12 +144,8 @@ class ResolutionPrecedenceMixin:
         if not member_expression:
             return _UNRESOLVED
 
-        owner = self._resolve_traversal(
-            left_expression,
-            context,
-            invoke_final=False,
-        )
-        if owner is _UNRESOLVED or isinstance(owner, PendingCall):
+        owner = self._resolve_local_owner(left_expression, context)
+        if owner is _UNRESOLVED:
             return _UNRESOLVED
 
         function, protected_path = self._resolve_local_member(owner, member_expression)
