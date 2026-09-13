@@ -91,7 +91,7 @@ class SemanticResolutionSession:
             label = labels[id(candidate)]
             if id(candidate) == id(selected):
                 continue
-            outcome = "beam_dropped" if id(candidate) not in kept_ids else "dominated"
+            outcome = "beam_dropped" if id(candidate) not in kept_ids else "not_selected"
             self.state = self.state.event(
                 ResolutionEvent(
                     "candidate_pruned",
