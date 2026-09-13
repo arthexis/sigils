@@ -30,6 +30,66 @@ class CallableStateMixin:
         """Preserve the provider-safe hook through the typed callable model."""
         return CallableState.classify(value).provider_safe
 
+    def _continuation_state(self, value, *, protected: bool = False) -> CallableState:
+        """Classify continuation viability through the shared callable model."""
+        return self._callable_state(value, protected=protected)
+
+    def _safe_continuation_candidate(self, session, context, key, index):
+        """Keep semantic continuation probes inside CallableState policy."""
+        candidate = super()._safe_continuation_candidate(session, context, key, index)
+        if candidate is _UNRESOLVED:
+            return _UNRESOLVED
+        state = self._continuation_state(candidate)
+        session.record(
+            "callable_state",
+            segment=index,
+            outcome=state.kind.value,
+            detail=key,
+            value=candidate,
+            callable_state=state if state.callable else None,
+            protected=state.protected,
+        )
+        return state.value if state.ready and state.approved else _UNRESOLVED
+
+    def _choose_structural_route(
+        self,
+        session,
+        result,
+        continuation,
+        value,
+        *,
+        key,
+        index,
+        protected_path,
+    ):
+        """Let typed callable state decide whether continuation is a viable route."""
+        if continuation is not _UNRESOLVED:
+            state = self._continuation_state(
+                continuation,
+                protected=protected_path,
+            )
+            if not state.ready or not state.approved:
+                continuation = _UNRESOLVED
+        return super()._choose_structural_route(
+            session,
+            result,
+            continuation,
+            value,
+            key=key,
+            index=index,
+            protected_path=protected_path,
+        )
+
+    def _run_continuation(self, function, value):
+        """Invoke continuations only after typed callable-state validation."""
+        state = self._continuation_state(
+            function,
+            protected=isinstance(value, Secret),
+        )
+        if not state.ready or not state.approved:
+            return _UNRESOLVED
+        return super()._run_continuation(state.value, value)
+
     def _resolve_explicit_pass(self, expression, context):
         """Resolve explicit passing using CallableState for every callable branch."""
         parts = self._split_explicit_pass(expression)
