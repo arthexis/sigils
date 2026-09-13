@@ -29,5 +29,23 @@ class Sigil(RenderMixin, ResolutionPrecedenceMixin, ResolverMixin):
             eager_only=True,
         )
 
+    @property
+    def _resolution_session(self):
+        """Return the semantic session scoped to the current thread."""
+        return getattr(self._resolution_local, "session", None)
+
+    @_resolution_session.setter
+    def _resolution_session(self, session):
+        """Store the semantic session only for the current thread."""
+        self._resolution_local.session = session
+
+    @_resolution_session.deleter
+    def _resolution_session(self):
+        """Clear only the current thread's semantic session."""
+        try:
+            del self._resolution_local.session
+        except AttributeError:
+            pass
+
 
 __all__ = ["Sigil"]
