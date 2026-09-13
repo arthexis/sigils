@@ -11,12 +11,12 @@ def _budget_events(metadata):
     ]
 
 
-def test_nested_resolution_budget_stops_continuation_lookup_recursion() -> None:
+def test_nested_resolution_budget_stops_recursive_argument_resolution() -> None:
     context = {
-        "value": "hello",
-        "transform": lambda value: value.upper(),
+        "double": lambda value: value * 2,
+        "number": 4,
     }
-    sigil = Sigil("[value.transform]")
+    sigil = Sigil("[double.number]")
     sigil.max_nested_resolution_depth = 1
 
     metadata = sigil.explain(context)
