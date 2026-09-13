@@ -105,8 +105,78 @@ class ResolutionPrecedenceMixin:
             phase="structural",
         )
 
+    def _safe_continuation_candidate(self, session, context, key, index):
+        """Probe a root continuation without invoking attributes or callables."""
+        raw_context = context.reveal() if isinstance(context, Secret) else context
+        if isinstance(raw_context, SafeNamespace):
+            result = session.resolve_member(
+                context,
+                key,
+                aliases=self._key_aliases,
+                segment=index,
+                protected_path=False,
+                phase="continuation_probe",
+            )
+            candidate = result.value if result.resolved else _UNRESOLVED
+        elif isinstance(raw_context, dict):
+            result = session.resolve_member(
+                context,
+                key,
+                aliases=self._key_aliases,
+                segment=index,
+                protected_path=False,
+                allow_attributes=False,
+                phase="continuation_probe",
+            )
+            candidate = result.value if result.resolved else _UNRESOLVED
+        elif key in tools:
+            candidate = tools[key]
+            session.record(
+                "root_tool_lookup",
+                segment=index,
+                outcome="probe",
+                detail=key,
+                value=candidate,
+            )
+        else:
+            return _UNRESOLVED
+
+        if isinstance(candidate, Secret):
+            candidate = candidate.reveal()
+        return candidate if callable(candidate) else _UNRESOLVED
+
+    def _choose_structural_route(
+        self,
+        session,
+        result,
+        continuation,
+        value,
+        *,
+        key,
+        index,
+        protected_path,
+    ):
+        """Use the bounded beam to rank member and continuation interpretations."""
+        candidates = []
+        if result.resolved and result.value is not None:
+            member_score = 30 if result.alias is None else 25
+            candidates.append(
+                (
+                    "member",
+                    result.value,
+                    member_score,
+                    result.value if callable(result.value) else None,
+                    result.protected,
+                )
+            )
+        if callable(continuation):
+            candidates.append(("continuation", value, 20, continuation, protected_path))
+        if not candidates:
+            return None
+        return session.select_candidate(candidates, segment=index)
+
     def _resolve_traversal(self, expression, context, *, invoke_final=True):
-        """Resolve ordinary traversal through one traced semantic state."""
+        """Resolve ordinary traversal through traced, bounded semantic state."""
         session, owns_session = self._begin_resolution_session(context)
         keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
         value = context
@@ -126,7 +196,49 @@ class ResolutionPrecedenceMixin:
                     temp = temp.reveal()
                 protected_path = result.protected
 
-                if (not result.resolved or temp is None) and index > 0 and not protected_path:
+                continuation = _UNRESOLVED
+                selected_route = None
+                if index > 0 and not protected_path:
+                    continuation = self._safe_continuation_candidate(
+                        session, context, key, index
+                    )
+                    selection = self._choose_structural_route(
+                        session,
+                        result,
+                        continuation,
+                        value,
+                        key=key,
+                        index=index,
+                        protected_path=protected_path,
+                    )
+                    if selection is not None:
+                        selected_route = selection[0]
+
+                if selected_route == "continuation":
+                    session.record(
+                        "continuation_lookup",
+                        segment=index,
+                        outcome="selected",
+                        detail=key,
+                        value=value,
+                    )
+                    temp = self._run_continuation(continuation, value)
+                    if temp is _UNRESOLVED:
+                        session.record(
+                            "continuation_lookup",
+                            segment=index,
+                            outcome="failed",
+                            detail=key,
+                            value=value,
+                        )
+                        return _UNRESOLVED
+                    bound_method = False
+                elif (
+                    selected_route is None
+                    and (not result.resolved or temp is None)
+                    and index > 0
+                    and not protected_path
+                ):
                     session.record(
                         "continuation_lookup",
                         segment=index,
