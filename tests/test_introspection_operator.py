@@ -84,7 +84,7 @@ def test_explain_output_is_plain_serializable_metadata() -> None:
     assert isinstance(metadata["memo"], dict)
 
 
-def test_question_mark_is_not_reserved_by_explain() -> None:
+def test_question_mark_remains_reserved_for_future_language_use() -> None:
     rendered = Sigil("[value ?]").solve({"value": 42})
 
     assert rendered == "[value ?]"
