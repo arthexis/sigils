@@ -149,15 +149,38 @@ class BoundedResolutionBeam:
         """Add candidates, merge equivalent states, and keep the best four."""
         return self.replace((*self._states, *states))
 
-    def _normalize(self, states: Iterable[ResolutionState]) -> tuple[ResolutionState, ...]:
-        dominant: dict[tuple[object, ...], ResolutionState] = {}
+    def classify(
+        self, states: Iterable[ResolutionState]
+    ) -> tuple[
+        tuple[ResolutionState, ...],
+        tuple[ResolutionState, ...],
+        tuple[ResolutionState, ...],
+    ]:
+        """Return kept, dominated, and width-dropped candidates by identity."""
+        states = tuple(states)
+        best_by_key: dict[tuple[object, ...], ResolutionState] = {}
+        dominated: list[ResolutionState] = []
         for state in states:
             key = state.dominance_key()
-            current = dominant.get(key)
-            if current is None or self._rank_key(state) > self._rank_key(current):
-                dominant[key] = state
-        ranked = sorted(dominant.values(), key=self._rank_key, reverse=True)
-        return tuple(ranked[: self.limit])
+            current = best_by_key.get(key)
+            if current is None:
+                best_by_key[key] = state
+                continue
+            if self._rank_key(state) > self._rank_key(current):
+                dominated.append(current)
+                best_by_key[key] = state
+            else:
+                dominated.append(state)
+
+        ranked = sorted(best_by_key.values(), key=self._rank_key, reverse=True)
+        kept = tuple(ranked[: self.limit])
+        kept_ids = {id(state) for state in kept}
+        dropped = tuple(state for state in ranked if id(state) not in kept_ids)
+        return kept, tuple(dominated), dropped
+
+    def _normalize(self, states: Iterable[ResolutionState]) -> tuple[ResolutionState, ...]:
+        kept, _dominated, _dropped = self.classify(states)
+        return kept
 
     @staticmethod
     def _rank_key(state: ResolutionState) -> tuple[int, int]:
