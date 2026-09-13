@@ -132,6 +132,7 @@ def test_pending_whitespace_route_does_not_escape_as_success() -> None:
     def add(left, right):
         return left + right
 
+    add.__sigils_safe_callable__ = True
     metadata = Sigil("[add left]").explain({"add": add, "left": 2})
 
     assert metadata["resolved"] is False
