@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import json
-
 from sigils import Sigil
 from sigils.secret import Secret
 
 
 def explain(template: str, context: dict) -> dict:
-    return json.loads(Sigil(template).solve(context))
+    return Sigil(template).explain(context)
 
 
-def test_question_operator_projects_successful_resolution() -> None:
+def test_explain_projects_successful_resolution() -> None:
     metadata = explain(
-        "[service.client.status ?]",
+        "[service.client.status]",
         {"service": {"client": {"status": "ready"}}},
     )
 
@@ -25,8 +23,8 @@ def test_question_operator_projects_successful_resolution() -> None:
     assert metadata["trace"][-1]["kind"] == "traversal_complete"
 
 
-def test_question_operator_explains_unresolved_expression() -> None:
-    metadata = explain("[missing ?]", {})
+def test_explain_reports_unresolved_expression() -> None:
+    metadata = explain("[missing]", {})
 
     assert metadata["resolved"] is False
     assert metadata["value_type"] is None
@@ -34,9 +32,9 @@ def test_question_operator_explains_unresolved_expression() -> None:
     assert any(event["outcome"] == "missing" for event in metadata["trace"])
 
 
-def test_question_operator_reuses_candidate_trace() -> None:
+def test_explain_reuses_candidate_trace() -> None:
     metadata = explain(
-        "[service.slugify ?]",
+        "[service.slugify]",
         {
             "service": {"slugify": "member"},
             "slugify": lambda value: str(value).upper(),
@@ -50,17 +48,16 @@ def test_question_operator_reuses_candidate_trace() -> None:
     assert "candidate_selected" in kinds
 
 
-def test_question_operator_never_reveals_secret_payload() -> None:
-    metadata_text = Sigil("[token ?]").solve({"token": Secret("swordfish")})
-    metadata = json.loads(metadata_text)
+def test_explain_never_reveals_secret_payload() -> None:
+    metadata = explain("[token]", {"token": Secret("swordfish")})
 
     assert metadata["resolved"] is True
     assert metadata["protected"] is True
     assert metadata["value_type"] == "Secret"
-    assert "swordfish" not in metadata_text
+    assert "swordfish" not in repr(metadata)
 
 
-def test_question_operator_does_not_replay_descriptor_lookup() -> None:
+def test_explain_does_not_replay_descriptor_lookup() -> None:
     class Service:
         def __init__(self) -> None:
             self.reads = 0
@@ -71,15 +68,34 @@ def test_question_operator_does_not_replay_descriptor_lookup() -> None:
             return "ready"
 
     service = Service()
-    metadata = explain("[service.status ?]", {"service": service})
+    metadata = explain("[service.status]", {"service": service})
 
     assert metadata["resolved"] is True
     assert service.reads == 1
     assert metadata["memo"]["misses"] >= 1
 
 
-def test_question_operator_output_is_stable_json() -> None:
-    rendered = Sigil("[value ?]").solve({"value": 42})
-    metadata = json.loads(rendered)
+def test_explain_output_is_plain_serializable_metadata() -> None:
+    metadata = explain("[value]", {"value": 42})
 
-    assert rendered == json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+    assert metadata["resolved"] is True
+    assert metadata["value_type"] == "int"
+    assert isinstance(metadata["trace"], list)
+    assert isinstance(metadata["memo"], dict)
+
+
+def test_question_mark_is_not_reserved_by_explain() -> None:
+    rendered = Sigil("[value ?]").solve({"value": 42})
+
+    assert rendered == "[value ?]"
+
+
+def test_explain_rejects_multi_expression_templates() -> None:
+    sigil = Sigil("[left] [right]")
+
+    try:
+        sigil.explain({"left": 1, "right": 2})
+    except ValueError as error:
+        assert "exactly one Sigil" in str(error)
+    else:
+        raise AssertionError("expected explain() to reject multiple expressions")
