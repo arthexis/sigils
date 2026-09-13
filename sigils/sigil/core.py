@@ -8,7 +8,7 @@ from .resolver import ResolverMixin
 
 
 class Sigil(RenderMixin, IntrospectionMixin, ResolutionPrecedenceMixin, ResolverMixin):
-    """Parse and resolve lazy and eager sigil templates."""
+    """Parse, resolve, and explain lazy and eager sigil templates."""
 
     cache = threading.local()
     max_depth = 6
