@@ -6,6 +6,8 @@ from typing import Iterable
 MAX_STATES = 4
 MAX_INTERPRETATION_EXPANSIONS = 64
 MAX_SEMANTIC_STEPS = 512
+MAX_NESTED_RESOLUTION_DEPTH = 16
+MAX_FALLBACK_DEPTH = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,8 +53,12 @@ class ResolutionBudget:
 
     max_expansions: int = MAX_INTERPRETATION_EXPANSIONS
     max_steps: int = MAX_SEMANTIC_STEPS
+    max_nested_depth: int = MAX_NESTED_RESOLUTION_DEPTH
+    max_fallback_depth: int = MAX_FALLBACK_DEPTH
     expansions: int = 0
     steps: int = 0
+    nested_depth: int = 0
+    fallback_depth: int = 0
     exhausted_reason: str | None = None
 
     def __post_init__(self) -> None:
@@ -60,10 +66,19 @@ class ResolutionBudget:
             raise ValueError("interpretation expansion budget must be positive")
         if self.max_steps < 1:
             raise ValueError("semantic step budget must be positive")
+        if self.max_nested_depth < 1:
+            raise ValueError("nested resolution depth budget must be positive")
+        if self.max_fallback_depth < 0:
+            raise ValueError("fallback depth budget cannot be negative")
 
     @property
     def exhausted(self) -> bool:
         return self.exhausted_reason is not None
+
+    def _exhaust(self, reason: str) -> bool:
+        if self.exhausted_reason is None:
+            self.exhausted_reason = reason
+        return False
 
     def consume_expansions(self, count: int) -> bool:
         """Consume candidate-expansion capacity without exceeding the hard limit."""
@@ -72,8 +87,7 @@ class ResolutionBudget:
         if count < 0:
             raise ValueError("candidate expansion count cannot be negative")
         if self.expansions + count > self.max_expansions:
-            self.exhausted_reason = "interpretation_expansions"
-            return False
+            return self._exhaust("interpretation_expansions")
         self.expansions += count
         return True
 
@@ -82,10 +96,35 @@ class ResolutionBudget:
         if self.exhausted:
             return False
         if self.steps + 1 > self.max_steps:
-            self.exhausted_reason = "semantic_steps"
-            return False
+            return self._exhaust("semantic_steps")
         self.steps += 1
         return True
+
+    def enter_resolution(self) -> bool:
+        """Enter one nested production traversal level."""
+        if self.exhausted:
+            return False
+        if self.nested_depth + 1 > self.max_nested_depth:
+            return self._exhaust("nested_resolution_depth")
+        self.nested_depth += 1
+        return True
+
+    def leave_resolution(self) -> None:
+        if self.nested_depth:
+            self.nested_depth -= 1
+
+    def enter_fallback(self) -> bool:
+        """Enter one compatibility fallback level."""
+        if self.exhausted:
+            return False
+        if self.fallback_depth + 1 > self.max_fallback_depth:
+            return self._exhaust("fallback_depth")
+        self.fallback_depth += 1
+        return True
+
+    def leave_fallback(self) -> None:
+        if self.fallback_depth:
+            self.fallback_depth -= 1
 
 
 class BoundedResolutionBeam:
