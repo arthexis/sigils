@@ -85,6 +85,30 @@ def test_member_resolution_reports_selected_alias() -> None:
     assert result.alias == "send_value"
 
 
+def test_member_resolution_rejects_malformed_signed_list_index() -> None:
+    result = resolve_member(["value"], "--1", aliases=no_aliases)
+
+    assert not result.resolved
+
+
+def test_member_resolution_reads_attribute_once() -> None:
+    class Owner:
+        def __init__(self) -> None:
+            self.reads = 0
+
+        @property
+        def value(self) -> str:
+            self.reads += 1
+            return "resolved"
+
+    owner = Owner()
+
+    result = resolve_member(owner, "value", aliases=no_aliases)
+
+    assert result.value == "resolved"
+    assert owner.reads == 1
+
+
 def test_member_resolution_blocks_attributes_after_safe_namespace() -> None:
     class Client:
         send = "attribute"
