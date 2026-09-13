@@ -1,10 +1,27 @@
 from __future__ import annotations
 
+import inspect
 import re
+from dataclasses import dataclass
 
 from ..secret import Secret
 from .constants import _UNRESOLVED
 from .modes import CallableState, ResolutionMode
+
+
+@dataclass(frozen=True, slots=True)
+class CallableArity:
+    """Typed arity evidence used by greedy and pending callable resolution."""
+
+    required: int | None
+
+    @property
+    def known(self) -> bool:
+        return self.required is not None
+
+    @property
+    def needs_arguments(self) -> bool:
+        return bool(self.required)
 
 
 class CallableStateMixin:
@@ -29,6 +46,30 @@ class CallableStateMixin:
     def _provider_callable(value):
         """Preserve the provider-safe hook through the typed callable model."""
         return CallableState.classify(value).provider_safe
+
+    def _callable_arity(self, value) -> CallableArity:
+        """Return required positional arity from the typed callable representation."""
+        state = value if isinstance(value, CallableState) else self._callable_state(value)
+        if not state.ready:
+            return CallableArity(None)
+        try:
+            parameters = inspect.signature(state.function).parameters.values()
+        except (TypeError, ValueError):
+            return CallableArity(None)
+        positional_kinds = {
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        }
+        required = sum(
+            parameter.kind in positional_kinds
+            and parameter.default is inspect.Parameter.empty
+            for parameter in parameters
+        )
+        return CallableArity(required)
+
+    def _required_positional_count(self, function):
+        """Preserve the resolver API while sourcing arity from typed evidence."""
+        return self._callable_arity(function).required
 
     def _continuation_state(self, value, *, protected: bool = False) -> CallableState:
         """Classify continuation viability through the shared callable model."""
