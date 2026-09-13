@@ -51,8 +51,13 @@ def test_segment_memo_avoids_repeating_descriptor_lookup_across_retry() -> None:
     service = Service()
     sigil = Sigil("[service status missing]")
 
-    assert sigil.solve({"service": service}) == "[service status missing]"
+    sigil.solve({"service": service})
+
     assert service.reads == 1
+    assert any(
+        event.kind == "segment_memo" and event.outcome == "hit"
+        for event in sigil._last_resolution_state.trace
+    )
 
 
 def test_continuation_behavior_is_preserved_under_semantic_traversal() -> None:
