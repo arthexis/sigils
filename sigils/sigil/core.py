@@ -1,13 +1,14 @@
 import re
 import threading
 
+from .introspection import IntrospectionMixin
 from .precedence import ResolutionPrecedenceMixin
 from .render import RenderMixin
 from .resolver import ResolverMixin
 
 
-class Sigil(RenderMixin, ResolutionPrecedenceMixin, ResolverMixin):
-    """Parse and resolve lazy and eager sigil templates."""
+class Sigil(RenderMixin, IntrospectionMixin, ResolutionPrecedenceMixin, ResolverMixin):
+    """Parse, resolve, and explain lazy and eager sigil templates."""
 
     cache = threading.local()
     max_depth = 6
