@@ -7,6 +7,7 @@ from .member import MemberResolution, resolve_member
 from .semantic import ResolutionEvent, ResolutionState, SegmentMemo
 
 _MISSING = object()
+_KEEP = object()
 
 
 @dataclass(slots=True)
@@ -27,7 +28,7 @@ class SemanticResolutionSession:
         segment: int | None = None,
         outcome: str | None = None,
         detail: str | None = None,
-        value: object | None = None,
+        value: object = _KEEP,
         protected: bool | None = None,
         callable_state: object | None = None,
     ) -> ResolutionState:
@@ -35,7 +36,7 @@ class SemanticResolutionSession:
         event = ResolutionEvent(kind, segment=segment, outcome=outcome, detail=detail)
         self.state = ResolutionState(
             self.state.position if segment is None else segment,
-            self.state.value if value is None else value,
+            self.state.value if value is _KEEP else value,
             callable_state=callable_state,
             protected=self.state.protected if protected is None else protected,
             score=self.state.score,
