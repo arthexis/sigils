@@ -135,3 +135,93 @@ def test_local_safe_namespace_still_requires_provider_approval() -> None:
     assert metadata["resolved"] is False
     assert metadata["failure_reason"] == "unsafe_callable"
     assert calls == []
+
+
+def test_continuation_route_uses_typed_ready_state() -> None:
+    metadata = Sigil("[value.transform]").explain(
+        {
+            "value": "hello",
+            "transform": lambda value: value.upper(),
+        }
+    )
+
+    assert metadata["resolved"] is True
+    assert any(
+        event["kind"] == "callable_state"
+        and event["outcome"] == "ready"
+        and event["detail"] == "transform"
+        for event in metadata["trace"]
+    )
+
+
+def test_callable_arity_evidence_tracks_required_inputs() -> None:
+    def transform(required, optional="default"):
+        return required, optional
+
+    sigil = Sigil("[value]")
+    arity = sigil._callable_arity(transform)
+
+    assert arity.known is True
+    assert arity.required == 1
+    assert arity.needs_arguments is True
+
+
+def test_pending_transitions_record_pending_then_result() -> None:
+    def combine(first, second, suffix):
+        return f"{first}:{second}:{suffix}"
+
+    metadata = Sigil("[first - combine.suffix - second]").explain(
+        {
+            "first": "alpha",
+            "second": "beta",
+            "suffix": "omega",
+            "combine": combine,
+        }
+    )
+
+    transitions = [
+        event
+        for event in metadata["trace"]
+        if event["kind"] == "callable_transition"
+    ]
+    assert metadata["resolved"] is True
+    assert [event["outcome"] for event in transitions] == ["pending", "value"]
+    assert transitions[0]["detail"].endswith("2->1")
+    assert transitions[1]["detail"].endswith("1->0")
+
+
+def test_bound_member_still_invokes_after_typed_classification() -> None:
+    class Record:
+        def status(self):
+            return "ready"
+
+    metadata = Sigil("[record.status]").explain({"record": Record()})
+
+    assert metadata["resolved"] is True
+    assert any(
+        event["kind"] == "callable_state" and event["outcome"] == "bound"
+        for event in metadata["trace"]
+    )
+    assert any(
+        event["kind"] == "callable_invoked" and event["outcome"] == "success"
+        for event in metadata["trace"]
+    )
+
+
+def test_provider_safe_local_callable_invokes_through_typed_policy() -> None:
+    metadata = Sigil("[safe :: send : payload]").explain(
+        {
+            "safe": SafeNamespace(
+                {"send": ApprovedCall(lambda value: f"approved:{value}")}
+            ),
+            "payload": "data",
+        }
+    )
+
+    assert metadata["resolved"] is True
+    assert any(
+        event["kind"] == "callable_state"
+        and event["outcome"] == "ready"
+        and event["detail"] == "send"
+        for event in metadata["trace"]
+    )
