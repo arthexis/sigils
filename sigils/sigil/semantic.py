@@ -4,6 +4,10 @@ from dataclasses import dataclass, replace
 from typing import Iterable
 
 MAX_STATES = 4
+MAX_INTERPRETATION_EXPANSIONS = 64
+MAX_SEMANTIC_STEPS = 512
+MAX_NESTED_RESOLUTION_DEPTH = 16
+MAX_FALLBACK_DEPTH = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +47,86 @@ class ResolutionState:
         )
 
 
+@dataclass(slots=True)
+class ResolutionBudget:
+    """Evaluation-scoped hard limits for semantic resolution work."""
+
+    max_expansions: int = MAX_INTERPRETATION_EXPANSIONS
+    max_steps: int = MAX_SEMANTIC_STEPS
+    max_nested_depth: int = MAX_NESTED_RESOLUTION_DEPTH
+    max_fallback_depth: int = MAX_FALLBACK_DEPTH
+    expansions: int = 0
+    steps: int = 0
+    nested_depth: int = 0
+    fallback_depth: int = 0
+    exhausted_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_expansions < 1:
+            raise ValueError("interpretation expansion budget must be positive")
+        if self.max_steps < 1:
+            raise ValueError("semantic step budget must be positive")
+        if self.max_nested_depth < 1:
+            raise ValueError("nested resolution depth budget must be positive")
+        if self.max_fallback_depth < 0:
+            raise ValueError("fallback depth budget cannot be negative")
+
+    @property
+    def exhausted(self) -> bool:
+        return self.exhausted_reason is not None
+
+    def _exhaust(self, reason: str) -> bool:
+        if self.exhausted_reason is None:
+            self.exhausted_reason = reason
+        return False
+
+    def consume_expansions(self, count: int) -> bool:
+        """Consume candidate-expansion capacity without exceeding the hard limit."""
+        if self.exhausted:
+            return False
+        if count < 0:
+            raise ValueError("candidate expansion count cannot be negative")
+        if self.expansions + count > self.max_expansions:
+            return self._exhaust("interpretation_expansions")
+        self.expansions += count
+        return True
+
+    def consume_step(self) -> bool:
+        """Consume one semantic decision/event slot."""
+        if self.exhausted:
+            return False
+        if self.steps + 1 > self.max_steps:
+            return self._exhaust("semantic_steps")
+        self.steps += 1
+        return True
+
+    def enter_resolution(self) -> bool:
+        """Enter one nested production traversal level."""
+        if self.exhausted:
+            return False
+        if self.nested_depth + 1 > self.max_nested_depth:
+            return self._exhaust("nested_resolution_depth")
+        self.nested_depth += 1
+        return True
+
+    def leave_resolution(self) -> None:
+        if self.nested_depth:
+            self.nested_depth -= 1
+
+    def enter_fallback(self) -> bool:
+        """Enter one compatibility fallback level."""
+        if self.exhausted:
+            return False
+        if self.fallback_depth + 1 > self.max_fallback_depth:
+            return self._exhaust("fallback_depth")
+        self.fallback_depth += 1
+        return True
+
+    def leave_fallback(self) -> None:
+        if self.fallback_depth:
+            self.fallback_depth -= 1
+
+
 class BoundedResolutionBeam:
     """Rank, merge, and cap live semantic interpretations."""
 
@@ -65,15 +149,38 @@ class BoundedResolutionBeam:
         """Add candidates, merge equivalent states, and keep the best four."""
         return self.replace((*self._states, *states))
 
-    def _normalize(self, states: Iterable[ResolutionState]) -> tuple[ResolutionState, ...]:
-        dominant: dict[tuple[object, ...], ResolutionState] = {}
+    def classify(
+        self, states: Iterable[ResolutionState]
+    ) -> tuple[
+        tuple[ResolutionState, ...],
+        tuple[ResolutionState, ...],
+        tuple[ResolutionState, ...],
+    ]:
+        """Return kept, dominated, and width-dropped candidates by identity."""
+        states = tuple(states)
+        best_by_key: dict[tuple[object, ...], ResolutionState] = {}
+        dominated: list[ResolutionState] = []
         for state in states:
             key = state.dominance_key()
-            current = dominant.get(key)
-            if current is None or self._rank_key(state) > self._rank_key(current):
-                dominant[key] = state
-        ranked = sorted(dominant.values(), key=self._rank_key, reverse=True)
-        return tuple(ranked[: self.limit])
+            current = best_by_key.get(key)
+            if current is None:
+                best_by_key[key] = state
+                continue
+            if self._rank_key(state) > self._rank_key(current):
+                dominated.append(current)
+                best_by_key[key] = state
+            else:
+                dominated.append(state)
+
+        ranked = sorted(best_by_key.values(), key=self._rank_key, reverse=True)
+        kept = tuple(ranked[: self.limit])
+        kept_ids = {id(state) for state in kept}
+        dropped = tuple(state for state in ranked if id(state) not in kept_ids)
+        return kept, tuple(dominated), dropped
+
+    def _normalize(self, states: Iterable[ResolutionState]) -> tuple[ResolutionState, ...]:
+        kept, _dominated, _dropped = self.classify(states)
+        return kept
 
     @staticmethod
     def _rank_key(state: ResolutionState) -> tuple[int, int]:

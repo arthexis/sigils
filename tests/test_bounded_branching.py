@@ -72,3 +72,25 @@ def test_candidate_selection_honors_hard_beam_width() -> None:
         if event.kind == "candidate_pruned" and event.outcome == "beam_dropped"
     ]
     assert len(dropped) == 2
+
+
+def test_equivalent_candidate_is_reported_as_dominated() -> None:
+    session = SemanticResolutionSession({})
+    value = object()
+
+    selected = session.select_candidate(
+        [
+            ("weaker", value, 10, None, False),
+            ("stronger", value, 20, None, False),
+        ],
+        segment=1,
+    )
+
+    assert selected is not None
+    assert selected[0] == "stronger"
+    assert any(
+        event.kind == "candidate_pruned"
+        and event.outcome == "dominated"
+        and event.detail == "weaker"
+        for event in session.state.trace
+    )
