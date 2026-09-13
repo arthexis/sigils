@@ -12,17 +12,14 @@ def _budget_events(metadata):
 
 
 def test_nested_resolution_budget_stops_continuation_lookup_recursion() -> None:
-    class Root:
-        value = "hello"
-
-        @staticmethod
-        def upper(value):
-            return value.upper()
-
-    sigil = Sigil("[value.upper]")
+    context = {
+        "value": "hello",
+        "transform": lambda value: value.upper(),
+    }
+    sigil = Sigil("[value.transform]")
     sigil.max_nested_resolution_depth = 1
 
-    metadata = sigil.explain(Root())
+    metadata = sigil.explain(context)
 
     assert metadata["resolved"] is False
     assert metadata["failure_reason"] == "nested_resolution_depth_budget_exceeded"
@@ -34,14 +31,12 @@ def test_nested_resolution_budget_stops_continuation_lookup_recursion() -> None:
 
 
 def test_default_nested_budget_preserves_continuation_behavior() -> None:
-    class Root:
-        value = "hello"
+    context = {
+        "value": "hello",
+        "transform": lambda value: value.upper(),
+    }
 
-        @staticmethod
-        def upper(value):
-            return value.upper()
-
-    assert Sigil("[value.upper]").solve(Root()) == "HELLO"
+    assert Sigil("[value.transform]").solve(context) == "HELLO"
 
 
 def test_zero_fallback_budget_disables_legacy_compatibility_route() -> None:
