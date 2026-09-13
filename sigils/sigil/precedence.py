@@ -1,5 +1,7 @@
 import re
 
+from ..namespace import SafeNamespace
+from ..secret import Secret
 from .constants import _UNRESOLVED
 from .pending import PendingCall
 
@@ -45,9 +47,111 @@ class ResolutionPrecedenceMixin:
                 return _UNRESOLVED
         return value
 
+    def _resolve_local_member(self, value, expression):
+        """Resolve a member path only from ``value``, never from root context."""
+        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
+        if not keys:
+            return _UNRESOLVED, False
+
+        protected_path = False
+        for key in keys:
+            parent_protected = isinstance(value, Secret)
+            lookup_value = value.reveal() if parent_protected else value
+
+            if isinstance(lookup_value, SafeNamespace):
+                member = _UNRESOLVED
+                for candidate in (key, *self._key_aliases(key)):
+                    try:
+                        member = lookup_value.resolve(candidate)
+                        break
+                    except KeyError:
+                        continue
+                if member is _UNRESOLVED:
+                    return _UNRESOLVED, protected_path
+                protected_path = True
+            elif protected_path:
+                if isinstance(lookup_value, dict) and key in lookup_value:
+                    member = lookup_value[key]
+                elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                    try:
+                        member = lookup_value[int(key)]
+                    except IndexError:
+                        return _UNRESOLVED, protected_path
+                else:
+                    return _UNRESOLVED, protected_path
+            elif isinstance(lookup_value, dict):
+                member = _UNRESOLVED
+                for candidate in (key, *self._key_aliases(key)):
+                    if candidate in lookup_value:
+                        member = lookup_value[candidate]
+                        break
+                if member is _UNRESOLVED:
+                    return _UNRESOLVED, protected_path
+            elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+                try:
+                    member = lookup_value[int(key)]
+                except IndexError:
+                    return _UNRESOLVED, protected_path
+            else:
+                member = _UNRESOLVED
+                for candidate in (key, *self._key_aliases(key)):
+                    if hasattr(lookup_value, candidate):
+                        member = getattr(lookup_value, candidate)
+                        break
+                if member is _UNRESOLVED:
+                    return _UNRESOLVED, protected_path
+
+            if parent_protected and not isinstance(member, Secret):
+                member = Secret(member)
+            value = member
+
+        return value, protected_path
+
+    def _resolve_local_call(self, expression, context):
+        """Invoke a callable extracted strictly from the value left of ``::``."""
+        if expression.count("::") != 1:
+            return _UNRESOLVED
+
+        left_expression, local_expression = expression.split("::", 1)
+        left_expression = left_expression.strip()
+        if not left_expression or not local_expression.strip():
+            return _UNRESOLVED
+
+        local_parts = local_expression.split(":")
+        member_expression = local_parts[0].strip()
+        argument_sets = local_parts[1:]
+        if not member_expression:
+            return _UNRESOLVED
+
+        owner = self._resolve_traversal(
+            left_expression,
+            context,
+            invoke_final=False,
+        )
+        if owner is _UNRESOLVED or isinstance(owner, PendingCall):
+            return _UNRESOLVED
+
+        function, protected_path = self._resolve_local_member(owner, member_expression)
+        if isinstance(function, Secret):
+            protected_path = True
+            function = function.reveal()
+        if function is _UNRESOLVED or not callable(function):
+            return _UNRESOLVED
+        if protected_path and not self._provider_callable(function):
+            return _UNRESOLVED
+
+        result = self._run_structured_call(function, argument_sets, context)
+        if result is _UNRESOLVED:
+            return _UNRESOLVED
+        if protected_path and result is not None and not isinstance(result, Secret):
+            return Secret(result)
+        return result
+
     def _resolve_single_expression(self, expression, context):
-        """Prefer whitespace traversal, then greedy calls, then legacy calls."""
+        """Apply explicit operators before whitespace traversal precedence."""
         expression = expression.strip()
+        if "::" in expression:
+            return self._resolve_local_call(expression, context)
         if (
             not expression
             or self._split_explicit_pass(expression)
