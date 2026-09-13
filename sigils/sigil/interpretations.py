@@ -18,6 +18,13 @@ class BoundedInterpretationMixin:
         ("legacy_whitespace", None, 10),
     )
 
+    @classmethod
+    def _whitespace_score(cls, label):
+        for candidate_label, _mode, score in cls._WHITESPACE_INTERPRETATIONS:
+            if candidate_label == label:
+                return score
+        raise ValueError(f"unknown whitespace interpretation: {label}")
+
     def _rank_whitespace_interpretations(self, session):
         """Return bounded interpretation labels in semantic-precedence order.
 
@@ -50,17 +57,23 @@ class BoundedInterpretationMixin:
             states.append(candidate)
             labels[id(candidate)] = label
 
-        beam = BoundedResolutionBeam(states)
-        kept_ids = {id(state) for state in beam.states}
-        for candidate in states:
-            if id(candidate) not in kept_ids:
-                session.record(
-                    "candidate_pruned",
-                    segment=0,
-                    outcome="beam_dropped",
-                    detail=labels[id(candidate)],
-                )
-        return tuple(labels[id(state)] for state in beam.states)
+        beam = BoundedResolutionBeam(())
+        kept, dominated, dropped = beam.classify(states)
+        for candidate in dominated:
+            session.record(
+                "candidate_pruned",
+                segment=0,
+                outcome="dominated",
+                detail=labels[id(candidate)],
+            )
+        for candidate in dropped:
+            session.record(
+                "candidate_pruned",
+                segment=0,
+                outcome="beam_dropped",
+                detail=labels[id(candidate)],
+            )
+        return tuple(labels[id(state)] for state in kept)
 
     def _run_whitespace_interpretation(self, label, expression, context):
         """Execute exactly one ranked interpretation route."""
@@ -96,7 +109,8 @@ class BoundedInterpretationMixin:
         if session is None:
             return super()._resolve_single_expression(expression, context)
 
-        for label in self._rank_whitespace_interpretations(session):
+        routes = self._rank_whitespace_interpretations(session)
+        for route_index, label in enumerate(routes):
             if session.exhausted:
                 return _UNRESOLVED
             session.record(
@@ -115,6 +129,10 @@ class BoundedInterpretationMixin:
                 )
                 continue
 
+            session.state = replace(
+                session.state,
+                score=session.state.score + self._whitespace_score(label),
+            )
             session.record(
                 "candidate_selected",
                 segment=0,
@@ -122,6 +140,13 @@ class BoundedInterpretationMixin:
                 detail=label,
                 value=value,
             )
+            for untried in routes[route_index + 1 :]:
+                session.record(
+                    "candidate_pruned",
+                    segment=0,
+                    outcome="not_selected",
+                    detail=untried,
+                )
             return value
 
         return _UNRESOLVED
