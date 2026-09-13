@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from ..secret import Secret
 from .constants import _UNRESOLVED
 from .pending import PendingCall
@@ -105,24 +103,27 @@ def project_resolution(state, value, *, expression):
 
 
 class IntrospectionMixin:
-    """Language-level ``?`` projection over the active semantic resolver."""
+    """Public explanation API over the production semantic resolver."""
 
-    def _resolve_single_expression(self, expression, context):
-        stripped = expression.strip()
-        if not stripped.endswith("?"):
-            return super()._resolve_single_expression(expression, context)
+    def _explain_expression(self):
+        """Return the single Sigil expression represented by this instance."""
+        matches = list(self.pattern.finditer(self._template))
+        if len(matches) != 1 or matches[0].span() != (0, len(self._template)):
+            raise ValueError("explain() requires a template containing exactly one Sigil")
+        return matches[0].group("expression")
 
-        inner = stripped[:-1].rstrip()
-        if not inner or inner.endswith("?"):
-            return super()._resolve_single_expression(expression, context)
+    def explain(self, context=None):
+        """Resolve this Sigil once and return serializable semantic metadata.
 
-        # Resolve exactly once through the ordinary production path. Because
-        # _resolve_expression() already owns the semantic session, this nested
-        # call reuses the same trace and memo rather than starting diagnostics.
-        value = super()._resolve_single_expression(inner, context)
-        session = getattr(self, "_resolution_session", None)
-        if session is None:
-            return _UNRESOLVED
-
-        metadata = project_resolution(session.state, value, expression=inner)
-        return json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+        Explanation is tooling behavior, not language syntax: it reuses the same
+        production resolver, state, memo, candidate decisions, and trace as an
+        ordinary evaluation while leaving punctuation such as ``?`` reserved for
+        future language features.
+        """
+        context = {} if context is None else context
+        expression = self._explain_expression()
+        value = self._resolve_expression(expression, context)
+        state = getattr(self, "_last_resolution_state", None)
+        if state is None:
+            raise RuntimeError("semantic resolution did not produce a state")
+        return project_resolution(state, value, expression=expression)
