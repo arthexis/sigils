@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from ..secret import Secret
 from .constants import _UNRESOLVED
 from .member import MemberResolution
@@ -30,7 +32,7 @@ class DirectionalBindingMixin:
 
     @staticmethod
     def _split_directional_binding(expression):
-        """Return ``(source, target)`` for one top-level arrow, else ``None``."""
+        """Return ``(source, target, tail)`` for one top-level arrow."""
         quote = None
         escaped = False
         depth = 0
@@ -78,20 +80,29 @@ class DirectionalBindingMixin:
         position, operator = found
         left = expression[:position].strip()
         right = expression[position + 2 :].strip()
+
         if operator == "->":
-            source, target = left, right
+            target_match = re.fullmatch(r"([A-Za-z_]\w*)(.*)", right, re.DOTALL)
+            if target_match is None:
+                return None
+            source = left
+            target = target_match.group(1)
+            tail = target_match.group(2).strip()
+            if tail and not tail.startswith("-"):
+                return None
         else:
-            target, source = left, right
+            target, source, tail = left, right, ""
+
         if not source or not target or not target.isidentifier():
             return None
-        return source, target
+        return source, target, tail
 
     def _resolve_single_expression(self, expression, context):
         binding = self._split_directional_binding(expression)
         if binding is None:
             return super()._resolve_single_expression(expression, context)
 
-        source, target = binding
+        source, target, tail = binding
         bindings, owns_scope = self._begin_binding_scope()
         try:
             value = super()._resolve_single_expression(source, context)
@@ -107,6 +118,11 @@ class DirectionalBindingMixin:
                     detail=target,
                     value=value,
                     protected=isinstance(value, Secret),
+                )
+            if tail:
+                return super()._resolve_single_expression(
+                    f"{target} {tail}",
+                    context,
                 )
             return value
         finally:
