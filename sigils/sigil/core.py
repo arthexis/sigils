@@ -2,6 +2,7 @@ import re
 import threading
 
 from .budgeting import ResolutionBudgetMixin
+from .callable_state import CallableStateMixin
 from .introspection import IntrospectionMixin
 from .interpretations import BoundedInterpretationMixin
 from .precedence import ResolutionPrecedenceMixin
@@ -14,6 +15,7 @@ class Sigil(
     IntrospectionMixin,
     ResolutionBudgetMixin,
     BoundedInterpretationMixin,
+    CallableStateMixin,
     ResolutionPrecedenceMixin,
     ResolverMixin,
 ):
