@@ -16,11 +16,11 @@ class Sigil(
     RenderMixin,
     IntrospectionMixin,
     DirectionalBindingMixin,
-    SequenceMixin,
     ResolutionBudgetMixin,
     BoundedInterpretationMixin,
     CallableStateMixin,
     ResolutionPrecedenceMixin,
+    SequenceMixin,
     ResolverMixin,
 ):
     """Parse, resolve, and explain lazy and eager sigil templates."""
