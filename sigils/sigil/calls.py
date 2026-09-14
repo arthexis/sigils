@@ -49,6 +49,7 @@ class CallMixin:
         args = []
         kwargs = {}
         protected = False
+        has_placement = False
         for argument in argument_sets:
             argument = argument.strip()
             if not argument:
@@ -57,8 +58,12 @@ class CallMixin:
             explicit_positional = argument.startswith("=")
             if explicit_positional:
                 raw_value = argument[1:].strip()
-                marker = parse_placement_marker(raw_value)
+                try:
+                    marker = parse_placement_marker(raw_value)
+                except ValueError:
+                    return _UNRESOLVED
                 if marker is not None:
+                    has_placement = True
                     args.append(marker)
                 else:
                     args.append(self._resolve_call_argument(raw_value, context))
@@ -74,13 +79,16 @@ class CallMixin:
                 protected = protected or value_protected
                 kwargs[name] = value
             else:
-                marker = parse_placement_marker(argument)
+                try:
+                    marker = parse_placement_marker(argument)
+                except ValueError:
+                    return _UNRESOLVED
                 if marker is not None:
+                    has_placement = True
                     args.append(marker)
                 else:
                     args.append(self._resolve_call_argument(argument, context))
 
-        has_placement = any(parse_placement_marker(argument.lstrip("=").strip()) is not None for argument in argument_sets)
         if incoming is _NO_INCOMING:
             if has_placement:
                 return _UNRESOLVED
