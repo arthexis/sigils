@@ -1,15 +1,17 @@
 from ..secret import Secret
 from .constants import _UNRESOLVED
+from .sequences import split_top_level_sequence
 
 
 class CallMixin:
     def _resolve_call_argument(self, argument, context):
         """Resolve one call argument, including comma-delimited tuple values."""
         argument = argument.strip()
-        if "," in argument:
+        sequence = split_top_level_sequence(argument)
+        if sequence is not None:
             return tuple(
                 self._resolve_call_argument(item, context)
-                for item in argument.split(",")
+                for item in sequence
             )
         if argument.startswith("%"):
             return argument[1:].strip()
