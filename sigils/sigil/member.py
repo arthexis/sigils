@@ -57,7 +57,7 @@ def resolve_member(
                 value = lookup_value[candidate]
                 selected_alias = None if candidate == key else candidate
                 break
-    elif isinstance(lookup_value, list) and key.lstrip("+-").isdigit():
+    elif isinstance(lookup_value, (list, tuple)) and key.lstrip("+-").isdigit():
         try:
             value = lookup_value[int(key)]
         except (IndexError, ValueError):
