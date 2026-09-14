@@ -101,35 +101,39 @@ class RenderMixin:
     ):
         if depth > self.max_depth:
             return template
-        template = self._protect_literals(template)
+        _bindings, owns_binding_scope = self._begin_binding_scope()
+        try:
+            template = self._protect_literals(template)
 
-        def replace(match):
-            if eager_only and not match.group("eager"):
-                return match.group(0)
-            expression = match.group("expression")
-            value = self._resolve_expression(expression, context)
-            if value is _UNRESOLVED:
-                return match.group(0)
-            protected = isinstance(value, Secret)
-            raw_value = value.reveal() if protected else value
-            if (
-                isinstance(raw_value, str)
-                and depth < self.max_depth
-                and self.pattern.search(raw_value)
-            ):
-                raw_value = self._render_template(
-                    raw_value,
-                    context,
-                    sep=sep,
-                    depth=depth + 1,
-                    eager_only=eager_only,
-                )
-                value = Secret(raw_value) if protected else raw_value
-            if eager_only and isinstance(value, Secret):
-                return self._capture_secret(value, depth=depth)
-            return self._stringify(value, sep)
+            def replace(match):
+                if eager_only and not match.group("eager"):
+                    return match.group(0)
+                expression = match.group("expression")
+                value = self._resolve_expression(expression, context)
+                if value is _UNRESOLVED:
+                    return match.group(0)
+                protected = isinstance(value, Secret)
+                raw_value = value.reveal() if protected else value
+                if (
+                    isinstance(raw_value, str)
+                    and depth < self.max_depth
+                    and self.pattern.search(raw_value)
+                ):
+                    raw_value = self._render_template(
+                        raw_value,
+                        context,
+                        sep=sep,
+                        depth=depth + 1,
+                        eager_only=eager_only,
+                    )
+                    value = Secret(raw_value) if protected else raw_value
+                if eager_only and isinstance(value, Secret):
+                    return self._capture_secret(value, depth=depth)
+                return self._stringify(value, sep)
 
-        return self.pattern.sub(replace, template)
+            return self.pattern.sub(replace, template)
+        finally:
+            self._finish_binding_scope(owns_binding_scope)
 
     @classmethod
     def _reveal_value(cls, value):
@@ -166,34 +170,38 @@ class RenderMixin:
 
     def _solve(self, context, depth=0, template=None):
         context = {} if context is None else context
-        template = self._template if template is None else template
-        template = self._protect_literals(template)
-        solved = {}
-        for match in self.pattern.finditer(template):
-            expression = match.group("expression")
-            value = self._resolve_expression(expression, context)
-            if value is _UNRESOLVED:
-                continue
-            raw_value = value.reveal() if isinstance(value, Secret) else value
-            if (
-                isinstance(raw_value, str)
-                and not isinstance(value, Secret)
-                and depth < self.max_depth
-                and self.pattern.search(raw_value)
-            ):
-                sub_values = self._solve(context, depth + 1, raw_value)
-                if sub_values:
-                    solved[expression] = {
-                        "value": self._render_template(
-                            raw_value,
-                            context,
-                            depth=depth + 1,
-                        ),
-                        "sub_values": sub_values,
-                    }
+        _bindings, owns_binding_scope = self._begin_binding_scope()
+        try:
+            template = self._template if template is None else template
+            template = self._protect_literals(template)
+            solved = {}
+            for match in self.pattern.finditer(template):
+                expression = match.group("expression")
+                value = self._resolve_expression(expression, context)
+                if value is _UNRESOLVED:
                     continue
-            solved[expression] = value
-        return solved
+                raw_value = value.reveal() if isinstance(value, Secret) else value
+                if (
+                    isinstance(raw_value, str)
+                    and not isinstance(value, Secret)
+                    and depth < self.max_depth
+                    and self.pattern.search(raw_value)
+                ):
+                    sub_values = self._solve(context, depth + 1, raw_value)
+                    if sub_values:
+                        solved[expression] = {
+                            "value": self._render_template(
+                                raw_value,
+                                context,
+                                depth=depth + 1,
+                            ),
+                            "sub_values": sub_values,
+                        }
+                        continue
+                solved[expression] = value
+            return solved
+        finally:
+            self._finish_binding_scope(owns_binding_scope)
 
     def results(self, context):
         return self._redact_value(self._solve(context))
