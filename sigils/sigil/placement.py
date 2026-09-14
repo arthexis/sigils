@@ -4,7 +4,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-_SELECTOR = re.compile(r"\[(?P<index>[1-9]\d*)\]\Z")
+_SELECTOR = re.compile(r"\[(?P<index>\d+)\]\Z")
 _WILDCARD = "[*]"
 
 
@@ -29,9 +29,12 @@ def parse_placement_marker(text: str):
     if text == _WILDCARD:
         return SPREAD
     match = _SELECTOR.fullmatch(text)
-    if match is not None:
-        return IncomingIndex(int(match.group("index")))
-    return None
+    if match is None:
+        return None
+    index = int(match.group("index"))
+    if index < 1:
+        raise ValueError("call placement selectors are one-based")
+    return IncomingIndex(index)
 
 
 def incoming_values(value) -> list[object]:
@@ -43,7 +46,11 @@ def incoming_values(value) -> list[object]:
 
 def route_incoming(arguments: Sequence[object], incoming: Sequence[object]) -> list[object]:
     """Route incoming values through GWAY-compatible one-based selectors."""
-    markers = [item for item in arguments if isinstance(item, (IncomingIndex, IncomingSpread))]
+    markers = [
+        item
+        for item in arguments
+        if isinstance(item, (IncomingIndex, IncomingSpread))
+    ]
     if not markers:
         return [*incoming, *arguments]
 
@@ -51,11 +58,7 @@ def route_incoming(arguments: Sequence[object], incoming: Sequence[object]) -> l
     if spreads > 1:
         raise ValueError("call placement may contain at most one [*] selector")
 
-    selected = {
-        item.index
-        for item in markers
-        if isinstance(item, IncomingIndex)
-    }
+    selected = {item.index for item in markers if isinstance(item, IncomingIndex)}
     if selected and max(selected) > len(incoming):
         raise IndexError(
             f"call placement selector [{max(selected)}] is out of range for "
