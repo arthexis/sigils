@@ -1,15 +1,17 @@
 from ..secret import Secret
 from .constants import _UNRESOLVED
+from .sequences import split_top_level_sequence
 
 
 class CallMixin:
     def _resolve_call_argument(self, argument, context):
         """Resolve one call argument, including comma-delimited tuple values."""
         argument = argument.strip()
-        if "," in argument:
+        sequence = split_top_level_sequence(argument)
+        if sequence is not None:
             return tuple(
                 self._resolve_call_argument(item, context)
-                for item in argument.split(",")
+                for item in sequence
             )
         if argument.startswith("%"):
             return argument[1:].strip()
@@ -17,6 +19,20 @@ class CallMixin:
         if resolved is _UNRESOLVED:
             return argument
         return resolved
+
+    def _unwrap_protected_argument(self, value):
+        """Reveal Secret values in tuple arguments and report protection."""
+        if isinstance(value, Secret):
+            return value.reveal(), True
+        if isinstance(value, tuple):
+            protected = False
+            items = []
+            for item in value:
+                item, item_protected = self._unwrap_protected_argument(item)
+                protected = protected or item_protected
+                items.append(item)
+            return tuple(items), protected
+        return value, False
 
     def _run_structured_call(self, function, argument_sets, context):
         """Invoke a callable from colon-delimited positional/keyword arguments."""
@@ -32,9 +48,8 @@ class CallMixin:
             if explicit_positional:
                 raw_value = argument[1:].strip()
                 value = self._resolve_call_argument(raw_value, context)
-                if isinstance(value, Secret):
-                    protected = True
-                    value = value.reveal()
+                value, value_protected = self._unwrap_protected_argument(value)
+                protected = protected or value_protected
                 args.append(value)
                 continue
 
@@ -44,15 +59,13 @@ class CallMixin:
                 if not name or not name.isidentifier():
                     return _UNRESOLVED
                 value = self._resolve_call_argument(raw_value, context)
-                if isinstance(value, Secret):
-                    protected = True
-                    value = value.reveal()
+                value, value_protected = self._unwrap_protected_argument(value)
+                protected = protected or value_protected
                 kwargs[name] = value
             else:
                 value = self._resolve_call_argument(argument, context)
-                if isinstance(value, Secret):
-                    protected = True
-                    value = value.reveal()
+                value, value_protected = self._unwrap_protected_argument(value)
+                protected = protected or value_protected
                 args.append(value)
         try:
             result = function(*args, **kwargs)
