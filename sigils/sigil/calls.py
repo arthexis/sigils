@@ -1,6 +1,9 @@
 from ..secret import Secret
 from .constants import _UNRESOLVED
+from .placement import incoming_values, parse_placement_marker, route_incoming
 from .sequences import split_top_level_sequence
+
+_NO_INCOMING = object()
 
 
 class CallMixin:
@@ -34,11 +37,19 @@ class CallMixin:
             return tuple(items), protected
         return value, False
 
-    def _run_structured_call(self, function, argument_sets, context):
-        """Invoke a callable from colon-delimited positional/keyword arguments."""
+    def _run_structured_call(
+        self,
+        function,
+        argument_sets,
+        context,
+        *,
+        incoming=_NO_INCOMING,
+    ):
+        """Invoke a callable from structured args and optional incoming values."""
         args = []
         kwargs = {}
         protected = False
+        has_placement = False
         for argument in argument_sets:
             argument = argument.strip()
             if not argument:
@@ -47,10 +58,15 @@ class CallMixin:
             explicit_positional = argument.startswith("=")
             if explicit_positional:
                 raw_value = argument[1:].strip()
-                value = self._resolve_call_argument(raw_value, context)
-                value, value_protected = self._unwrap_protected_argument(value)
-                protected = protected or value_protected
-                args.append(value)
+                try:
+                    marker = parse_placement_marker(raw_value)
+                except ValueError:
+                    return _UNRESOLVED
+                if marker is not None:
+                    has_placement = True
+                    args.append(marker)
+                else:
+                    args.append(self._resolve_call_argument(raw_value, context))
                 continue
 
             if "=" in argument:
@@ -63,12 +79,33 @@ class CallMixin:
                 protected = protected or value_protected
                 kwargs[name] = value
             else:
-                value = self._resolve_call_argument(argument, context)
-                value, value_protected = self._unwrap_protected_argument(value)
-                protected = protected or value_protected
-                args.append(value)
+                try:
+                    marker = parse_placement_marker(argument)
+                except ValueError:
+                    return _UNRESOLVED
+                if marker is not None:
+                    has_placement = True
+                    args.append(marker)
+                else:
+                    args.append(self._resolve_call_argument(argument, context))
+
+        if incoming is _NO_INCOMING:
+            if has_placement:
+                return _UNRESOLVED
+        else:
+            try:
+                args = route_incoming(args, incoming_values(incoming))
+            except (IndexError, ValueError):
+                return _UNRESOLVED
+
+        unwrapped_args = []
+        for value in args:
+            value, value_protected = self._unwrap_protected_argument(value)
+            protected = protected or value_protected
+            unwrapped_args.append(value)
+
         try:
-            result = function(*args, **kwargs)
+            result = function(*unwrapped_args, **kwargs)
         except (TypeError, ValueError):
             return _UNRESOLVED
         if protected and result is not None and not isinstance(result, Secret):

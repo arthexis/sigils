@@ -231,6 +231,27 @@ class CallableStateMixin:
                     argument,
                     detail=target_expression,
                 )
+            elif ":" in target_expression and "::" not in target_expression:
+                target_parts = target_expression.split(":")
+                target_name = target_parts[0].strip()
+                argument_sets = target_parts[1:]
+                if not target_name:
+                    return _UNRESOLVED
+                target = self._resolve_traversal(
+                    target_name,
+                    context,
+                    mode=ResolutionMode.LOOKUP,
+                )
+                target_state = self._callable_state(target)
+                if not target_state.ready or not target_state.approved:
+                    return _UNRESOLVED
+                value = self._run_structured_call(
+                    target_state.value,
+                    argument_sets,
+                    context,
+                    incoming=value,
+                )
+                value_state = self._callable_state(value)
             else:
                 target = self._resolve_traversal(
                     target_expression,

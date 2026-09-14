@@ -38,7 +38,11 @@ class Sigil(
             max_depth if max_depth is not None else self.__class__.max_depth
         )
         self.debug = debug if debug is not None else self.__class__.debug
-        self.pattern = re.compile(r"(?P<eager>%)?\[(?P<expression>.*?)\]")
+        self.pattern = re.compile(
+            r"(?P<eager>%)?\["
+            r"(?P<expression>(?:[^\[\]]|\[[^\[\]]*\])*)"
+            r"\]"
+        )
         self._template = self._render_template(
             self._template,
             self._ambient_context(),
