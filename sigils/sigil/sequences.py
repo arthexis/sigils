@@ -44,16 +44,24 @@ def split_top_level_sequence(expression: str) -> tuple[str, ...] | None:
 
 
 class SequenceMixin:
-    """Resolve comma-separated expressions as tuples."""
+    """Resolve comma-separated expressions as tuples below explicit operators."""
 
     def _resolve_single_expression(self, expression, context):
+        expression = expression.strip()
+        if (
+            "::" in expression
+            or ":" in expression
+            or self._split_explicit_pass(expression)
+        ):
+            return super()._resolve_single_expression(expression, context)
+
         sequence = split_top_level_sequence(expression)
         if sequence is None:
             return super()._resolve_single_expression(expression, context)
 
         values = []
         for item in sequence:
-            value = self._resolve_single_expression(item, context)
+            value = self._resolve_expression(item, context)
             if value is _UNRESOLVED:
                 return _UNRESOLVED
             values.append(value)
