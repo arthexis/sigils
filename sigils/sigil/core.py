@@ -1,6 +1,7 @@
 import re
 import threading
 
+from .bindings import DirectionalBindingMixin
 from .budgeting import ResolutionBudgetMixin
 from .callable_state import CallableStateMixin
 from .introspection import IntrospectionMixin
@@ -13,6 +14,7 @@ from .resolver import ResolverMixin
 class Sigil(
     RenderMixin,
     IntrospectionMixin,
+    DirectionalBindingMixin,
     ResolutionBudgetMixin,
     BoundedInterpretationMixin,
     CallableStateMixin,
