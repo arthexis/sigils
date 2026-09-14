@@ -9,12 +9,14 @@ from .interpretations import BoundedInterpretationMixin
 from .precedence import ResolutionPrecedenceMixin
 from .render import RenderMixin
 from .resolver import ResolverMixin
+from .sequences import SequenceMixin
 
 
 class Sigil(
     RenderMixin,
     IntrospectionMixin,
     DirectionalBindingMixin,
+    SequenceMixin,
     ResolutionBudgetMixin,
     BoundedInterpretationMixin,
     CallableStateMixin,
