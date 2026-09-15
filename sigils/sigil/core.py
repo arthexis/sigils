@@ -3,7 +3,9 @@ import threading
 
 from .bindings import DirectionalBindingMixin
 from .budgeting import ResolutionBudgetMixin
+from .call_placement_syntax import ColonlessCallPlacementMixin
 from .callable_state import CallableStateMixin
+from .colon_data import ColonDataMixin
 from .introspection import IntrospectionMixin
 from .interpretations import BoundedInterpretationMixin
 from .precedence import ResolutionPrecedenceMixin
@@ -15,6 +17,8 @@ from .sequences import SequenceMixin
 class Sigil(
     RenderMixin,
     IntrospectionMixin,
+    ColonDataMixin,
+    ColonlessCallPlacementMixin,
     DirectionalBindingMixin,
     SequenceMixin,
     ResolutionBudgetMixin,

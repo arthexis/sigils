@@ -27,14 +27,14 @@ def test_literal_fallback_can_include_spaces() -> None:
     assert Sigil("[missing|:not available]") % {} == "not available"
 
 
-def test_trailing_colon_returns_left_side_as_literal() -> None:
-    context = {"ready": lambda: "called"}
-    assert Sigil("[ready:]") % context == "ready"
+def test_trailing_colon_is_ordinary_lookup_data() -> None:
+    context = {"ready": lambda: "called", "ready:": "literal-key"}
+    assert Sigil("[ready:]") % context == "literal-key"
 
 
-def test_colon_with_right_side_still_forces_call() -> None:
+def test_colon_with_right_side_does_not_force_call() -> None:
     context = {
         "name": "Alice",
         "greet": lambda value: f"Hello, {value}!",
     }
-    assert Sigil("[greet:name]") % context == "Hello, Alice!"
+    assert Sigil("[greet:name]") % context == "[greet:name]"

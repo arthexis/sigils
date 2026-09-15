@@ -54,20 +54,21 @@ def test_explicit_pass_uses_default_front_insertion() -> None:
         "collect": _collect,
         "tail": "tail",
     }
-    result = Sigil("[values - collect : tail]").results(context)
-    assert result["values - collect : tail"] == ("A", "B", "tail")
+    expression = "values - collect tail"
+    result = Sigil(f"[{expression}]").results(context)
+    assert result[expression] == ("A", "B", "tail")
 
 
 def test_explicit_pass_numeric_selectors_reorder_incoming_values() -> None:
     context = {"values": ("A", "B", "C", "D"), "collect": _collect}
-    expression = "values - collect : [2] : [1]"
+    expression = "values - collect [2] [1]"
     result = Sigil(f"[{expression}]").results(context)
     assert result[expression] == ("B", "A")
 
 
 def test_explicit_pass_wildcard_uses_unselected_remainder() -> None:
     context = {"values": ("A", "B", "C", "D"), "collect": _collect}
-    expression = "values - collect : [3] : [*] : [1]"
+    expression = "values - collect [3] [*] [1]"
     result = Sigil(f"[{expression}]").results(context)
     assert result[expression] == ("C", "B", "D", "A")
 
@@ -78,20 +79,20 @@ def test_explicit_selector_disables_implicit_insertion() -> None:
         "collect": _collect,
         "tail": "tail",
     }
-    expression = "values - collect : [2] : tail"
+    expression = "values - collect [2] tail"
     result = Sigil(f"[{expression}]").results(context)
     assert result[expression] == ("B", "tail")
 
 
 def test_out_of_range_selector_keeps_call_unresolved() -> None:
     context = {"values": ("A", "B"), "collect": _collect}
-    expression = "values - collect : [3]"
+    expression = "values - collect [3]"
     assert expression not in Sigil(f"[{expression}]").results(context)
 
 
 def test_multiple_wildcards_keep_call_unresolved() -> None:
     context = {"values": ("A", "B"), "collect": _collect}
-    expression = "values - collect : [*] : [*]"
+    expression = "values - collect [*] [*]"
     assert expression not in Sigil(f"[{expression}]").results(context)
 
 
@@ -100,6 +101,6 @@ def test_selected_secret_protects_call_result() -> None:
         "values": ("public", Secret("secret")),
         "collect": _collect,
     }
-    expression = "values - collect : [2]"
+    expression = "values - collect [2]"
     result = Sigil(f"[{expression}]").results(context)
     assert result[expression] == Secret.REDACTED
