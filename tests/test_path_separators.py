@@ -39,15 +39,21 @@ def test_colon_does_not_force_a_call() -> None:
 
 
 def test_colon_is_part_of_an_exact_lookup_key() -> None:
-    context = {
-        "logs:read": "scope",
-        "https://logs.arthexis.com": "endpoint",
-        "12:30": "time",
-    }
+    context = {"logs:read": "scope", "12:30": "time"}
 
     assert Sigil("[logs:read]").solve(context) == "scope"
-    assert Sigil("[https://logs.arthexis.com]").solve(context) == "endpoint"
     assert Sigil("[12:30]").solve(context) == "time"
+
+
+def test_colon_bearing_literal_templates_stay_opaque() -> None:
+    values = (
+        "https://logs.arthexis.com",
+        "foo:bar:baz",
+        "scope=logs:read",
+    )
+
+    for value in values:
+        assert Sigil(value).solve({}) == value
 
 
 def test_double_colon_is_not_a_local_call_operator() -> None:
