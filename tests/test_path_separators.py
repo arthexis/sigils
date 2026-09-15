@@ -45,6 +45,20 @@ def test_colon_is_part_of_an_exact_lookup_key() -> None:
     assert Sigil("[12:30]").solve(context) == "time"
 
 
+def test_colon_exact_lookup_does_not_invoke_callable_value() -> None:
+    called = False
+
+    def scope_value() -> str:
+        nonlocal called
+        called = True
+        return "executed"
+
+    result = Sigil("[logs:read]").results({"logs:read": scope_value})
+
+    assert result["logs:read"] is scope_value
+    assert called is False
+
+
 def test_colon_bearing_literal_templates_stay_opaque() -> None:
     values = (
         "https://logs.arthexis.com",
