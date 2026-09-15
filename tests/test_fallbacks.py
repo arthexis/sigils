@@ -1,4 +1,4 @@
-"""Fallback-chain and literal-value behavior for Sigils."""
+"""Fallback-chain behavior for Sigils."""
 
 from sigils import Sigil
 
@@ -18,13 +18,14 @@ def test_fallback_returns_last_falsey_value_when_none_are_truthy() -> None:
     assert Sigil("[disabled|count]") % context == "0"
 
 
-def test_literal_fallback_is_terminal() -> None:
-    context = {"missing_too": "should-not-be-read"}
-    assert Sigil("[missing|:offline|missing_too]") % context == "offline"
+def test_fallback_resolves_normal_branch_from_context() -> None:
+    context = {"offline": "offline", "missing_too": "should-not-be-read"}
+    assert Sigil("[missing|offline|missing_too]") % context == "offline"
 
 
-def test_literal_fallback_can_include_spaces() -> None:
-    assert Sigil("[missing|:not available]") % {} == "not available"
+def test_colon_prefixed_fallback_is_an_ordinary_lookup_key() -> None:
+    context = {":offline": "colon-key"}
+    assert Sigil("[missing|:offline]") % context == "colon-key"
 
 
 def test_trailing_colon_is_ordinary_lookup_data() -> None:
