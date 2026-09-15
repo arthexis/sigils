@@ -107,59 +107,50 @@ space-separated argument behavior remains available.
     [health errors]
     [greet name]
 
-The colon is the explicit call operator. Each colon-delimited segment after the
-target is one argument. Whitespace around ``:``, ``,``, and ``=`` is ignored.
-Arguments without ``=`` are positional; ``name=value`` is a keyword argument.
-Multiple colons provide multiple arguments.
-
-.. code-block:: text
-
-    [network ip : wlan0]
-    [network ip : interface=wlan0]
-    [func : first : second]
-    [func : left=first : right=second]
-    [func : first : right=second]
-
-``:=`` explicitly marks a positional argument. It is equivalent to an ordinary
-positional segment, but is useful when the argument text itself contains an
-``=`` and must not be interpreted as a keyword assignment.
-
-.. code-block:: text
-
-    [echo := value]
-    [echo := left=right]
-
-Commas do not create additional function arguments. Comma-separated members
-inside one colon segment are resolved individually and passed as one tuple.
-This also works for keyword arguments.
-
-.. code-block:: text
-
-    [func : a,b]
-    [func : values=a,b,c]
-    [func : first : options=a,b]
-
-Prefixing a call value with ``%`` keeps that value literal rather than resolving
-it from the context.
-
-.. code-block:: text
-
-    [greet : %name]
-
+Calls use whitespace/traversal semantics rather than a dedicated call token.
 A final callable is invoked automatically, so ``[now]`` calls a zero-argument
-``now`` value. A trailing colon with no right-hand side instead makes the left
-side a literal constant: ``[now:]`` renders ``now``.
+``now`` value. Functions that require arguments can consume whitespace-separated
+values, for example ``[greet name]``.
+
+The colon has no grammatical meaning. ``:``, ``::``, ``:=``, trailing colons,
+and colon-prefixed names are ordinary lookup data. Exact keys containing those
+characters can therefore be resolved directly:
+
+.. code-block:: python
+
+    context = {
+        "logs:read": "scope",
+        "service::send": "double-colon key",
+        "echo:=value": "assignment-shaped key",
+        "now:": "trailing-colon key",
+        ":offline": "prefixed key",
+    }
+
+    print(Sigil("[logs:read]") % context)       # scope
+    print(Sigil("[service::send]") % context)   # double-colon key
+    print(Sigil("[echo:=value]") % context)     # assignment-shaped key
+    print(Sigil("[now:]") % context)            # trailing-colon key
+    print(Sigil("[:offline]") % context)        # prefixed key
+
+Top-level comma-separated expressions resolve as a tuple of their individual
+values:
+
+.. code-block:: python
+
+    context = {"a": 1, "b": 2, "c": 3}
+    print(Sigil("[a,b,c]").results(context)["a,b,c"])
+    # (1, 2, 3)
 
 Fallback chains use ``|`` and ``||``. Loose ``|`` advances on any Python-falsey
 value. Strict ``||`` advances only for an unresolved value, ``None``, or an
 empty set/frozenset; values such as ``False``, ``0``, ``""``, ``[]``, ``{}``,
-and ``()`` are retained. A branch beginning with ``:`` is a terminal literal
-fallback.
+and ``()`` are retained. Every fallback branch is resolved normally from the
+context; there is no literal-fallback marker.
 
 .. code-block:: text
 
-    [primary|backup|:offline]
-    [primary||backup||:offline]
+    [primary|backup|offline]
+    [primary||backup||offline]
 
 
 Context
@@ -211,8 +202,7 @@ Built-in tools can be chained as part of an expression:
 
     print(Sigil("[name.upper]") % context)  # ALICE
 
-Functions in the context may also be called with the historical whitespace
-syntax or the explicit colon syntax:
+Functions in the context can be called with whitespace syntax:
 
 .. code-block:: python
 
@@ -222,20 +212,11 @@ syntax or the explicit colon syntax:
     }
 
     print(Sigil("[greet name]") % context)
-    print(Sigil("[greet : name]") % context)
     # Hello, Alice!
 
-Prefixing an argument with ``%`` treats that argument as a literal value
-instead of resolving it as another sigil:
-
-.. code-block:: python
-
-    print(Sigil("[greet : %name]") % context)
-    # Hello, name!
-
-Multi-argument tools receive all declared arguments after each argument is
-resolved. For example, structured-data tools can parse a value and select a
-field in one expression:
+Multi-argument tools receive their whitespace-separated arguments after each
+argument is resolved. For example, structured-data tools can parse a value and
+select a field in one expression:
 
 .. code-block:: python
 

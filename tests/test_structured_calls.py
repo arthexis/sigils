@@ -57,10 +57,13 @@ def test_structured_call_helper_still_supports_keyword_arguments() -> None:
 
 def test_provider_callable_requiring_args_stays_unresolved_without_arguments() -> None:
     command = ApprovedCall(lambda interface: f"ip:{interface}", requires_args=True)
-    context = {"network": SafeNamespace({"ip": command})}
+    context = {
+        "network": SafeNamespace({"ip": command}),
+        "offline": "offline",
+    }
 
     assert Sigil("[network.ip]").solve(context) == "[network.ip]"
-    assert Sigil("[network.ip||:offline]").solve(context) == "offline"
+    assert Sigil("[network.ip||offline]").solve(context) == "offline"
 
 
 def test_unmarked_callable_from_safe_namespace_remains_blocked() -> None:
