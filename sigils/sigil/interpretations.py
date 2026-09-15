@@ -98,9 +98,7 @@ class BoundedInterpretationMixin:
         expression = expression.strip()
         if (
             not expression
-            or "::" in expression
             or self._split_explicit_pass(expression)
-            or ":" in expression
             or not re.search(r"\s", expression)
         ):
             return super()._resolve_single_expression(expression, context)
