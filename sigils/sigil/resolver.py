@@ -425,15 +425,6 @@ class ResolverMixin(CallMixin):
         if self._split_explicit_pass(expression):
             value = self._resolve_explicit_pass(expression, context)
             return _UNRESOLVED if isinstance(value, PendingCall) else value
-        if expression.endswith(":"):
-            return expression[:-1].strip()
-        if ":" in expression:
-            parts = expression.split(":")
-            target = parts[0].strip()
-            function = self._resolve_traversal(target, context, invoke_final=False)
-            if function is _UNRESOLVED or not callable(function):
-                return _UNRESOLVED
-            return self._run_structured_call(function, parts[1:], context)
         traversed = self._resolve_traversal(expression, context)
         if isinstance(traversed, PendingCall):
             return _UNRESOLVED
@@ -468,8 +459,5 @@ class ResolverMixin(CallMixin):
             )
             if not should_fallback:
                 return value
-            branch = branch.strip()
-            if branch.startswith(":"):
-                return branch[1:]
-            value = self._resolve_single_expression(branch, context)
+            value = self._resolve_single_expression(branch.strip(), context)
         return value
