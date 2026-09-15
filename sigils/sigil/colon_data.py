@@ -24,7 +24,7 @@ class ColonDataMixin:
         value = self._resolve_traversal(
             expression,
             context,
-            mode=ResolutionMode.CALL,
+            mode=ResolutionMode.LOOKUP,
         )
         if isinstance(value, PendingCall):
             return _UNRESOLVED
