@@ -4,7 +4,7 @@ from ..namespace import SafeNamespace
 from ..secret import Secret
 from ..tools import tools
 from .constants import _UNRESOLVED
-from .member import MemberResolution, resolve_member
+from .member import MemberResolution
 from .modes import CallableKind, CallableState, ResolutionMode
 from .pending import PendingCall
 from .session import SemanticResolutionSession
@@ -544,93 +544,10 @@ class ResolutionPrecedenceMixin:
                 return _UNRESOLVED
         return value
 
-    def _resolve_local_member(self, value, expression):
-        """Resolve a member path only from ``value``, never from root context."""
-        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
-        if not keys:
-            return _UNRESOLVED, False
-
-        protected_path = False
-        for key in keys:
-            result = resolve_member(
-                value,
-                key,
-                aliases=self._key_aliases,
-                protected_path=protected_path,
-            )
-            if not result.resolved:
-                return _UNRESOLVED, protected_path
-            value = result.value
-            protected_path = result.protected
-
-        return value, protected_path
-
-    def _resolve_local_owner(self, expression, context):
-        """Resolve a local-call owner without continuation or implicit invocation."""
-        keys = [key for key in re.split(r"[.\s]+", expression.strip()) if key]
-        if not keys:
-            return _UNRESOLVED
-
-        owner = self._resolve_traversal(
-            keys[0],
-            context,
-            mode=ResolutionMode.LOOKUP,
-        )
-        if owner is _UNRESOLVED or isinstance(owner, PendingCall):
-            return _UNRESOLVED
-        if len(keys) == 1:
-            return owner
-
-        owner, _ = self._resolve_local_member(owner, ".".join(keys[1:]))
-        return owner
-
-    def _resolve_local_call(self, expression, context):
-        """Invoke a callable extracted strictly from the value left of ``::``."""
-        if expression.count("::") != 1:
-            return _UNRESOLVED
-
-        left_expression, local_expression = expression.split("::", 1)
-        left_expression = left_expression.strip()
-        if not left_expression or not local_expression.strip():
-            return _UNRESOLVED
-
-        local_parts = local_expression.split(":")
-        member_expression = local_parts[0].strip()
-        argument_sets = local_parts[1:]
-        if not member_expression:
-            return _UNRESOLVED
-
-        owner = self._resolve_local_owner(left_expression, context)
-        if owner is _UNRESOLVED:
-            return _UNRESOLVED
-
-        function, protected_path = self._resolve_local_member(owner, member_expression)
-        if isinstance(function, Secret):
-            protected_path = True
-            function = function.reveal()
-        callable_state = CallableState.classify(function, protected=protected_path)
-        if function is _UNRESOLVED or callable_state.kind is not CallableKind.READY:
-            return _UNRESOLVED
-        if protected_path and not self._provider_callable(function):
-            return _UNRESOLVED
-
-        result = self._run_structured_call(function, argument_sets, context)
-        if result is _UNRESOLVED:
-            return _UNRESOLVED
-        if protected_path and result is not None and not isinstance(result, Secret):
-            return Secret(result)
-        return result
-
     def _resolve_single_expression(self, expression, context):
-        """Apply explicit operators before whitespace traversal precedence."""
+        """Apply whitespace traversal precedence after explicit value passing."""
         expression = expression.strip()
-        if "::" in expression:
-            return self._resolve_local_call(expression, context)
-        if (
-            not expression
-            or self._split_explicit_pass(expression)
-            or ":" in expression
-        ):
+        if not expression or self._split_explicit_pass(expression):
             return super()._resolve_single_expression(expression, context)
         if not re.search(r"\s", expression):
             return super()._resolve_single_expression(expression, context)
