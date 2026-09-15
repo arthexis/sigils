@@ -38,11 +38,22 @@ def test_colon_does_not_force_a_call() -> None:
     assert Sigil("[probe:status]").solve(context) == "[probe:status]"
 
 
-def test_colon_is_part_of_an_exact_lookup_key() -> None:
-    context = {"logs:read": "scope", "12:30": "time"}
+def test_all_retired_colon_forms_are_exact_lookup_data() -> None:
+    context = {
+        "logs:read": "scope",
+        "12:30": "time",
+        "service::send": "double",
+        "echo:=value": "assignment",
+        "now:": "trailing",
+        ":offline": "prefixed",
+    }
 
     assert Sigil("[logs:read]").solve(context) == "scope"
     assert Sigil("[12:30]").solve(context) == "time"
+    assert Sigil("[service::send]").solve(context) == "double"
+    assert Sigil("[echo:=value]").solve(context) == "assignment"
+    assert Sigil("[now:]").solve(context) == "trailing"
+    assert Sigil("[:offline]").solve(context) == "prefixed"
 
 
 def test_colon_exact_lookup_does_not_invoke_callable_value() -> None:
