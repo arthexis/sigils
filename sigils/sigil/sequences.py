@@ -48,11 +48,7 @@ class SequenceMixin:
 
     def _resolve_single_expression(self, expression, context):
         expression = expression.strip()
-        if (
-            "::" in expression
-            or ":" in expression
-            or self._split_explicit_pass(expression)
-        ):
+        if self._split_explicit_pass(expression):
             return super()._resolve_single_expression(expression, context)
 
         sequence = split_top_level_sequence(expression)
