@@ -6,12 +6,11 @@ from .pending import PendingCall
 
 
 class ColonDataMixin:
-    """Keep colon-bearing expressions out of the legacy explicit-call grammar.
+    """Treat colon-bearing expressions as opaque lookup data.
 
-    ``:`` used to force a call and ``::`` selected a local callable. Calls are
-    now expressed by ordinary whitespace/traversal semantics, so a colon inside
-    an expression is treated as data. The existing ``|:literal`` fallback marker
-    is handled by the fallback parser and remains unchanged.
+    ``:``, ``::``, ``:=``, trailing colons, and colon-prefixed fallback branches
+    have no grammatical meaning. Calls use ordinary whitespace/traversal
+    semantics instead.
     """
 
     def _resolve_single_expression(self, expression, context):
