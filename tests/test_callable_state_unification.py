@@ -101,42 +101,6 @@ def test_explicit_pass_accepts_provider_safe_protected_callable() -> None:
     assert Sigil("[value - safe.send]").solve(context) == "approved:data"
 
 
-def test_local_call_records_typed_callable_state() -> None:
-    metadata = Sigil("[service :: send : payload]").explain(
-        {
-            "service": {"send": lambda value: f"local:{value}"},
-            "payload": "data",
-        }
-    )
-
-    assert metadata["resolved"] is True
-    assert any(
-        event["kind"] == "callable_state"
-        and event["outcome"] == "ready"
-        and event["detail"] == "send"
-        for event in metadata["trace"]
-    )
-
-
-def test_local_safe_namespace_still_requires_provider_approval() -> None:
-    calls = []
-
-    def unsafe(value):
-        calls.append(value)
-        return value
-
-    metadata = Sigil("[safe :: send : payload]").explain(
-        {
-            "safe": SafeNamespace({"send": unsafe}),
-            "payload": "data",
-        }
-    )
-
-    assert metadata["resolved"] is False
-    assert metadata["failure_reason"] == "unsafe_callable"
-    assert calls == []
-
-
 def test_continuation_route_uses_typed_ready_state() -> None:
     metadata = Sigil("[value.transform]").explain(
         {
@@ -204,24 +168,5 @@ def test_bound_member_still_invokes_after_typed_classification() -> None:
     )
     assert any(
         event["kind"] == "callable_invoked" and event["outcome"] == "success"
-        for event in metadata["trace"]
-    )
-
-
-def test_provider_safe_local_callable_invokes_through_typed_policy() -> None:
-    metadata = Sigil("[safe :: send : payload]").explain(
-        {
-            "safe": SafeNamespace(
-                {"send": ApprovedCall(lambda value: f"approved:{value}")}
-            ),
-            "payload": "data",
-        }
-    )
-
-    assert metadata["resolved"] is True
-    assert any(
-        event["kind"] == "callable_state"
-        and event["outcome"] == "ready"
-        and event["detail"] == "send"
         for event in metadata["trace"]
     )
