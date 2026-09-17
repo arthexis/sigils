@@ -141,16 +141,53 @@ values:
     print(Sigil("[a,b,c]").results(context)["a,b,c"])
     # (1, 2, 3)
 
-Fallback chains use ``|`` and ``||``. Loose ``|`` advances on any Python-falsey
-value. Strict ``||`` advances only for an unresolved value, ``None``, or an
-empty set/frozenset; values such as ``False``, ``0``, ``""``, ``[]``, ``{}``,
-and ``()`` are retained. Every fallback branch is resolved normally from the
-context; there is no literal-fallback marker.
+Fallbacks use one optional top-level ``|`` separator. The canonical form is
+``[name | default]`` with one space on each side of ``|``. Whitespace around
+the separator is optional when parsing.
+
+The left side is resolved normally. If it resolves successfully, its value is
+kept even when it is falsey, including ``False``, ``0``, ``""``, ``[]``,
+``{}``, and ``()``. If the left side is unresolved, the right side is returned
+as literal text. The right side is never resolved as another context lookup or
+Sigil expression, and type conversion remains the responsibility of the caller.
 
 .. code-block:: text
 
-    [primary|backup|offline]
-    [primary||backup||offline]
+    [logs.source | /tmp/gway-runs]
+    [host | localhost]
+    [count | 10]
+    [mode | production]
+
+For example, when ``logs.source`` is missing, ``[logs.source | /tmp/gway-runs]``
+resolves to the literal string ``/tmp/gway-runs``. Likewise, ``[count | 10]``
+resolves to the string ``"10"`` when ``count`` is missing.
+
+Only one top-level fallback is supported. Chained fallbacks and the historical
+``||`` operator are invalid:
+
+.. code-block:: text
+
+    [a | b | c]   # invalid
+    [a || b]      # invalid
+
+Pipes inside already-supported quoted or nested syntax are not treated as
+additional top-level fallback separators.
+
+Downstream integrations should treat the literal Sigil fallback as the final
+syntax-level default. For GWay semantic variables, the intended precedence is:
+
+.. code-block:: text
+
+    runtime/context
+    -> GWAY_<NORMALIZED_SEMANTIC_NAME>
+    -> TOML variable
+    -> literal Sigil default
+    -> unresolved
+
+This simplified fallback contract is a breaking grammar change from the older
+truthiness-based ``|`` chains and strict ``||`` fallbacks. Downstream consumers
+that relied on evaluated fallback branches should move that logic into their
+configuration/context layer before updating to the corresponding Sigils release.
 
 
 Context
