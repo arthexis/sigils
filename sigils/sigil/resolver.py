@@ -402,22 +402,6 @@ class ResolverMixin(CallMixin):
             value = temp
         return value if value is not None else _UNRESOLVED
 
-    @staticmethod
-    def _fallback_truthy(value):
-        if value is _UNRESOLVED:
-            return False
-        raw_value = value.reveal() if isinstance(value, Secret) else value
-        return bool(raw_value)
-
-    @staticmethod
-    def _strict_fallback_missing(value):
-        if value is _UNRESOLVED:
-            return True
-        raw_value = value.reveal() if isinstance(value, Secret) else value
-        return raw_value is None or (
-            isinstance(raw_value, (set, frozenset)) and not raw_value
-        )
-
     def _resolve_single_expression(self, expression, context):
         expression = expression.strip()
         if not expression:
@@ -438,26 +422,46 @@ class ResolverMixin(CallMixin):
 
     @staticmethod
     def _split_fallback_expression(expression):
-        parts = re.split(r"(\|\|?)", expression)
-        branches = [parts[0]]
-        operators = []
-        for index in range(1, len(parts), 2):
-            operators.append(parts[index])
-            branches.append(parts[index + 1])
-        return branches, operators
+        """Split one top-level literal fallback while preserving nested pipes."""
+        separators = []
+        stack = []
+        quote = None
+        escaped = False
+        closing = {"(": ")", "[": "]", "{": "}"}
+
+        for index, character in enumerate(expression):
+            if quote is not None:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == quote:
+                    quote = None
+                continue
+
+            if character in {'"', "'"}:
+                quote = character
+                continue
+            if character in closing:
+                stack.append(closing[character])
+                continue
+            if stack and character == stack[-1]:
+                stack.pop()
+                continue
+            if character == "|" and not stack:
+                separators.append(index)
+
+        if len(separators) > 1:
+            raise ValueError("Sigil expressions support only one top-level fallback")
+        if not separators:
+            return expression.strip(), None
+
+        separator = separators[0]
+        return expression[:separator].strip(), expression[separator + 1 :].strip()
 
     def _resolve_expression(self, expression, context):
-        if "|" not in expression:
-            return self._resolve_single_expression(expression, context)
-        branches, operators = self._split_fallback_expression(expression)
-        value = self._resolve_single_expression(branches[0], context)
-        for operator, branch in zip(operators, branches[1:], strict=True):
-            should_fallback = (
-                not self._fallback_truthy(value)
-                if operator == "|"
-                else self._strict_fallback_missing(value)
-            )
-            if not should_fallback:
-                return value
-            value = self._resolve_single_expression(branch.strip(), context)
-        return value
+        left_expression, literal_default = self._split_fallback_expression(expression)
+        value = self._resolve_single_expression(left_expression, context)
+        if value is not _UNRESOLVED or literal_default is None:
+            return value
+        return literal_default
