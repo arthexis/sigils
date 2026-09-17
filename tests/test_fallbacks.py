@@ -32,7 +32,8 @@ def test_optional_whitespace_around_separator(expression: str, expected: str) ->
     [False, 0, "", [], {}, ()],
 )
 def test_falsey_resolved_values_do_not_trigger_fallback(value) -> None:
-    assert Sigil("[value | fallback]").solve({"value": value}) == value
+    result = Sigil("[value | fallback]").results({"value": value})
+    assert result["value | fallback"] == value
 
 
 @pytest.mark.parametrize(
