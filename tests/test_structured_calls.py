@@ -63,7 +63,7 @@ def test_provider_callable_requiring_args_stays_unresolved_without_arguments() -
     }
 
     assert Sigil("[network.ip]").solve(context) == "[network.ip]"
-    assert Sigil("[network.ip||offline]").solve(context) == "offline"
+    assert Sigil("[network.ip | offline]").solve(context) == "offline"
 
 
 def test_unmarked_callable_from_safe_namespace_remains_blocked() -> None:
