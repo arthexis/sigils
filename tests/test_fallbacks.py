@@ -1,31 +1,87 @@
-"""Fallback-chain behavior for Sigils."""
+"""Single literal fallback behavior for Sigils."""
+
+import pytest
 
 from sigils import Sigil
 
 
-def test_fallback_uses_first_truthy_value() -> None:
-    context = {"primary": "", "secondary": "ready", "tertiary": "later"}
-    assert Sigil("[primary|secondary|tertiary]") % context == "ready"
+def test_missing_value_uses_literal_default() -> None:
+    assert Sigil("[missing | fallback]").solve({}) == "fallback"
 
 
-def test_fallback_skips_unresolved_and_false_values() -> None:
-    context = {"disabled": False, "count": 0, "name": "live"}
-    assert Sigil("[missing|disabled|count|name]") % context == "live"
+def test_fallback_rhs_is_not_resolved_from_context() -> None:
+    context = {"fallback": "context-value"}
+    assert Sigil("[missing | fallback]").solve(context) == "fallback"
 
 
-def test_fallback_returns_last_falsey_value_when_none_are_truthy() -> None:
-    context = {"disabled": False, "count": 0}
-    assert Sigil("[disabled|count]") % context == "0"
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("[missing|default]", "default"),
+        ("[missing |default]", "default"),
+        ("[missing| default]", "default"),
+        ("[missing | default]", "default"),
+    ],
+)
+def test_optional_whitespace_around_separator(expression: str, expected: str) -> None:
+    assert Sigil(expression).solve({}) == expected
 
 
-def test_fallback_resolves_normal_branch_from_context() -> None:
-    context = {"offline": "offline", "missing_too": "should-not-be-read"}
-    assert Sigil("[missing|offline|missing_too]") % context == "offline"
+@pytest.mark.parametrize(
+    "value",
+    [False, 0, "", [], {}, ()],
+)
+def test_falsey_resolved_values_do_not_trigger_fallback(value) -> None:
+    result = Sigil("[value | fallback]").results({"value": value})
+    assert result["value | fallback"] == value
 
 
-def test_colon_prefixed_fallback_is_an_ordinary_lookup_key() -> None:
+@pytest.mark.parametrize(
+    ("literal", "expected"),
+    [
+        ("/tmp/gway-runs", "/tmp/gway-runs"),
+        ("https://example.test/a?b=c", "https://example.test/a?b=c"),
+        ("10", "10"),
+        ("production mode", "production mode"),
+        ("", ""),
+    ],
+)
+def test_literal_defaults_are_returned_as_text(literal: str, expected: str) -> None:
+    assert Sigil(f"[missing | {literal}]").solve({}) == expected
+
+
+def test_resolved_value_wins_over_literal_default() -> None:
+    assert Sigil("[name | fallback]").solve({"name": "primary"}) == "primary"
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "[a|b|c]",
+        "[a || b]",
+        "[a || b || c]",
+    ],
+)
+def test_multiple_top_level_fallback_separators_are_rejected(expression: str) -> None:
+    with pytest.raises(ValueError, match="only one top-level fallback"):
+        Sigil(expression).solve({})
+
+
+def test_quoted_pipe_is_not_a_top_level_fallback_separator() -> None:
+    left, default = Sigil._split_fallback_expression('call("a|b") | default')
+    assert left == 'call("a|b")'
+    assert default == "default"
+
+
+def test_nested_pipe_is_not_a_top_level_fallback_separator() -> None:
+    left, default = Sigil._split_fallback_expression("call({a|b}) | default")
+    assert left == "call({a|b})"
+    assert default == "default"
+
+
+def test_colon_prefixed_fallback_is_literal_text() -> None:
     context = {":offline": "colon-key"}
-    assert Sigil("[missing|:offline]") % context == "colon-key"
+    assert Sigil("[missing | :offline]").solve(context) == ":offline"
 
 
 def test_trailing_colon_is_ordinary_lookup_data() -> None:
